@@ -1,0 +1,58 @@
+# Phase 2+ shape: Postgres, an API process, and the worker as its own process
+# so a slow model call can never starve request handling.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sikpan
+      POSTGRES_PASSWORD: sikpan
+      POSTGRES_DB: sikpan
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sikpan"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENV: ${ENV:-dev}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      DATABASE_URL: postgresql+asyncpg://sikpan:sikpan@db:5432/sikpan
+      MEDIA_ROOT: /srv/var/media
+      VISION_PROVIDER: ${VISION_PROVIDER:-stub}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      RUN_WORKER_IN_PROCESS: "false"   # the worker service below owns this
+      EXPOSE_LOGIN_CODE: ${EXPOSE_LOGIN_CODE:-false}
+    ports:
+      - "8000:8000"
+    volumes:
+      - media:/srv/var/media
+
+  worker:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["python", "-m", "app.jobs.worker"]
+    environment:
+      ENV: ${ENV:-dev}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      DATABASE_URL: postgresql+asyncpg://sikpan:sikpan@db:5432/sikpan
+      MEDIA_ROOT: /srv/var/media
+      VISION_PROVIDER: ${VISION_PROVIDER:-stub}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - media:/srv/var/media
+
+volumes:
+  pgdata:
+  media:

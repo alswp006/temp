@@ -1,0 +1,64 @@
+name,body_part,equipment,met_value,aliases
+바벨 스쿼트,leg,barbell,5.0,스쿼트|백스쿼트|바벨스쿼트|squat|back squat
+프론트 스쿼트,leg,barbell,5.0,프론트스쿼트|front squat
+레그 프레스,leg,machine,4.5,레그프레스|leg press
+레그 익스텐션,leg,machine,3.5,레그익스텐션|leg extension
+레그 컬,leg,machine,3.5,레그컬|라잉레그컬|leg curl
+런지,leg,bodyweight,4.5,워킹런지|덤벨런지|lunge
+불가리안 스플릿 스쿼트,leg,dumbbell,5.0,불가리안스플릿스쿼트|bulgarian split squat
+힙 쓰러스트,leg,barbell,4.5,힙쓰러스트|힙스러스트|hip thrust
+루마니안 데드리프트,leg,barbell,5.5,루마니안데드리프트|rdl|romanian deadlift
+데드리프트,back,barbell,6.0,컨벤셔널데드리프트|deadlift
+카프 레이즈,leg,machine,3.0,카프레이즈|종아리운동|calf raise
+벤치프레스,chest,barbell,5.0,바벨벤치프레스|벤치|bench press
+인클라인 벤치프레스,chest,barbell,5.0,인클라인벤치|incline bench press
+덤벨 프레스,chest,dumbbell,4.5,덤벨벤치프레스|dumbbell press
+체스트 프레스,chest,machine,4.0,체스트프레스|chest press
+케이블 플라이,chest,cable,3.5,케이블플라이|펙덱플라이|cable fly|pec deck
+푸시업,chest,bodyweight,4.0,팔굽혀펴기|push up|pushup
+딥스,chest,bodyweight,5.0,딥스|dips
+랫풀다운,back,machine,4.0,렛풀다운|랫풀|lat pulldown
+시티드 로우,back,machine,4.0,시티드로우|케이블로우|seated row
+바벨 로우,back,barbell,5.0,바벨로우|벤트오버로우|barbell row
+덤벨 로우,back,dumbbell,4.5,덤벨로우|원암덤벨로우|dumbbell row
+풀업,back,bodyweight,6.0,턱걸이|pull up|pullup
+친업,back,bodyweight,6.0,친업|chin up
+어시스티드 풀업,back,machine,4.0,어시스티드풀업|assisted pull up
+백 익스텐션,back,bodyweight,3.5,백익스텐션|back extension
+굿모닝,back,barbell,4.5,굿모닝|good morning
+오버헤드 프레스,shoulder,barbell,4.5,밀리터리프레스|오버헤드프레스|ohp|overhead press
+덤벨 숄더프레스,shoulder,dumbbell,4.0,덤벨숄더프레스|숄더프레스|shoulder press
+사이드 레터럴 레이즈,shoulder,dumbbell,3.5,사레레|레터럴레이즈|side lateral raise
+프론트 레이즈,shoulder,dumbbell,3.5,프론트레이즈|front raise
+리어 델트 플라이,shoulder,dumbbell,3.5,리어델트|벤트오버레터럴|rear delt fly
+페이스 풀,shoulder,cable,3.5,페이스풀|face pull
+슈러그,shoulder,dumbbell,3.5,슈러그|shrug
+덤벨 컬,arm,dumbbell,3.5,덤벨컬|이두컬|dumbbell curl|biceps curl
+바벨 컬,arm,barbell,3.5,바벨컬|barbell curl
+해머 컬,arm,dumbbell,3.5,해머컬|hammer curl
+트라이셉스 푸시다운,arm,cable,3.5,삼두푸시다운|푸시다운|triceps pushdown
+라잉 트라이셉스 익스텐션,arm,barbell,3.5,라잉익스텐션|스컬크러셔|skull crusher
+케이블 크런치,core,cable,3.5,케이블크런치|cable crunch
+크런치,core,bodyweight,3.0,윗몸일으키기|싯업|crunch|sit up
+레그 레이즈,core,bodyweight,3.5,레그레이즈|행잉레그레이즈|leg raise
+플랭크,core,bodyweight,3.0,플랭크|plank
+러시안 트위스트,core,bodyweight,3.5,러시안트위스트|russian twist
+앱 휠,core,etc,4.0,앱휠|ab wheel|롤아웃
+케틀벨 스윙,fullbody,kettlebell,7.0,케틀벨스윙|kettlebell swing
+버피,fullbody,bodyweight,8.0,버피테스트|burpee
+마운틴 클라이머,fullbody,bodyweight,7.0,마운틴클라이머|mountain climber
+박스 점프,fullbody,etc,7.0,박스점프|box jump
+배틀로프,fullbody,etc,8.0,배틀로프|battle rope
+러닝머신,cardio,machine,8.0,트레드밀|런닝머신|treadmill|러닝
+사이클,cardio,machine,6.5,실내자전거|스피닝|cycling|bike
+로잉머신,cardio,machine,7.0,로잉|rowing
+스텝밀,cardio,machine,9.0,천국의계단|stairmaster
+일립티컬,cardio,machine,5.0,크로스트레이너|elliptical
+줄넘기,cardio,etc,10.0,줄넘기|jump rope
+수영,cardio,etc,7.0,수영|swimming
+걷기,cardio,bodyweight,3.5,산책|walking
+등산,cardio,etc,7.0,하이킹|hiking
+클라이밍,fullbody,etc,8.0,볼더링|climbing
+요가,fullbody,bodyweight,3.0,요가|yoga
+필라테스,fullbody,etc,3.5,필라테스|pilates
+스트레칭,fullbody,bodyweight,2.5,스트레칭|stretching

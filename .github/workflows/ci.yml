@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Test
+        # The stub vision provider means the suite needs no API key and no
+        # network — CI exercises the same pipeline the app runs.
+        env:
+          VISION_PROVIDER: stub
+          SECRET_KEY: ci-secret-not-used-anywhere-real
+        run: python -m pytest -q
+
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Migrations apply from scratch
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./ci.db
+          SECRET_KEY: ci-secret
+        run: alembic upgrade head
+
+      - name: Models and migrations agree
+        # A model change without a migration is the single easiest way to break
+        # a deploy, so fail the build rather than discover it in production.
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./ci.db
+          SECRET_KEY: ci-secret
+        run: |
+          alembic check
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sikpan
+          POSTGRES_PASSWORD: sikpan
+          POSTGRES_DB: sikpan
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sikpan"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,postgres]"
+
+      - name: Migrations apply on Postgres
+        env:
+          DATABASE_URL: postgresql+asyncpg://sikpan:sikpan@localhost:5432/sikpan
+          SECRET_KEY: ci-secret
+        run: alembic upgrade head

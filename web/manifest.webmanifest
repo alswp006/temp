@@ -1,0 +1,21 @@
+{
+  "name": "식판 — 식단·운동 기록",
+  "short_name": "식판",
+  "description": "기록을 나 혼자 하지 않아도 되는 식단·운동 기록 앱",
+  "lang": "ko",
+  "start_url": "/app/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f5f0",
+  "theme_color": "#f7f5f0",
+  "icons": [
+    { "src": "/app/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/app/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/app/icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "식사 촬영", "url": "/app/#/log" },
+    { "name": "오늘", "url": "/app/#/today" }
+  ]
+}
