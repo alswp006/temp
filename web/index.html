@@ -11,6 +11,12 @@
   <link rel="icon" href="/app/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="/app/icons/icon-192.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <!-- black-translucent은 상태바 아래로 콘텐츠를 넣습니다. viewport-fit=cover와
+       헤더의 env(safe-area-inset-top) 패딩이 이미 있어야 성립하는데, 둘 다 있습니다.
+       이게 없으면 다크 테마에서 상태바만 흰 띠로 남습니다. -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="식판" />
   <link rel="stylesheet" href="/app/css/app.css" />
 </head>
 <body>
