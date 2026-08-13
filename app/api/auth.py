@@ -79,8 +79,11 @@ async def request_code(payload: LoginRequest, db: DbSession) -> LoginRequestResp
             mailer.mask_email(email),
         )
 
+    # `sent`는 "메일이 실제로 나갔다"만 뜻합니다. 개발 모드에서 코드를
+    # 응답에 실어 보냈다고 True로 만들면, 클라이언트가 "메일을 확인하세요"를
+    # 띄우고 사용자는 오지 않을 메일을 기다립니다.
     return LoginRequestResponse(
-        sent=sent or settings.expose_login_code,
+        sent=sent,
         dev_code=code if settings.expose_login_code else None,
     )
 
