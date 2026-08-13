@@ -279,6 +279,41 @@ class ApiToken(Base):
     created_at: Mapped[datetime] = _utcnow_col()
 
 
+class DevicePlatform(str, enum.Enum):
+    IOS = "ios"
+    ANDROID = "android"
+    WEB = "web"
+
+
+class DeviceToken(Base):
+    """푸시를 받을 기기.
+
+    한 사용자가 여러 기기를 가질 수 있고, 토큰은 앱 재설치·OS 업데이트에
+    말없이 바뀝니다. 그래서 (user, token)이 아니라 **token이 유일키**입니다 —
+    기기를 남에게 넘기고 그 사람이 로그인하면 같은 토큰이 다른 사용자에게
+    붙어야 하고, 이전 사용자에게 알림이 가면 안 됩니다.
+    """
+
+    __tablename__ = "device_tokens"
+    # user_id 인덱스는 컬럼의 index=True가 이미 만듭니다. 여기에 또 걸면
+    # 같은 컬럼에 인덱스가 두 개 생겨 쓰기마다 둘 다 갱신됩니다.
+    __table_args__ = (UniqueConstraint("token", name="uq_device_token"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token: Mapped[str] = mapped_column(String(255))
+    platform: Mapped[DevicePlatform] = mapped_column(
+        EnumStr(DevicePlatform, 16), default=DevicePlatform.IOS
+    )
+    app_version: Mapped[str | None] = mapped_column(String(32))
+    last_seen_at: Mapped[datetime] = _utcnow_col()
+    # 서버가 UNREGISTERED를 받으면 여기에 시각을 찍고 다시 보내지 않습니다.
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = _utcnow_col()
+
+
 # --------------------------------------------------------------------------
 # Canteens ("내 식사 세트"의 출처) and menu plans
 # --------------------------------------------------------------------------
@@ -868,4 +903,6 @@ class Notification(Base):
     body: Mapped[str | None] = mapped_column(Text)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 푸시를 시도한 시각. 하루 상한을 세는 기준이자 재전송 방지입니다.
+    pushed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     created_at: Mapped[datetime] = _utcnow_col()

@@ -21,6 +21,7 @@ from app.schemas import (
     WeightOut,
 )
 from app.services import audit, calibration, permissions, targets as targets_service
+from app.services.notify import notify
 
 router = APIRouter(tags=["body"])
 
@@ -218,22 +219,21 @@ async def propose_target(
     db.add(row)
     await db.flush()
 
-    db.add(
-        Notification(
-            user_id=mentee.id,
-            kind="target_proposed",
-            title="코치가 목표를 제안했습니다",
-            body=(
-                f"{payload.target_kcal:.0f}kcal / 단백질 "
-                f"{payload.target_protein_g:.0f}g"
-                + (f" · {payload.note}" if payload.note else "")
-            ),
-            payload={
-                "target_id": row.id,
-                "needs_confirmation": verdict.needs_confirmation,
-                "weekly_loss_kg": verdict.weekly_loss_kg,
-            },
-        )
+    await notify(
+        db,
+        user_id=mentee.id,
+        kind="target_proposed",
+        title="코치가 목표를 제안했습니다",
+        body=(
+            f"{payload.target_kcal:.0f}kcal / 단백질 "
+            f"{payload.target_protein_g:.0f}g"
+            + (f" · {payload.note}" if payload.note else "")
+        ),
+        payload={
+            "target_id": row.id,
+            "needs_confirmation": verdict.needs_confirmation,
+            "weekly_loss_kg": verdict.weekly_loss_kg,
+        },
     )
     await audit.record(
         db,

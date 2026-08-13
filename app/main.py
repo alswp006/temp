@@ -13,13 +13,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from app import observability
 from app.api import api_router
 from app.config import REPO_ROOT, settings
 from app.db import create_all, dispose_engine, session_scope
 from app.errors import AppError
 from app.jobs import handlers  # noqa: F401 - registers job handlers
 from app.jobs.worker import worker_loop
-from app.services import nutrition
+from app.services import nutrition, push
 from app.vision import close_provider, get_provider
 
 logging.basicConfig(
@@ -33,6 +34,9 @@ WEB_DIR = REPO_ROOT / "web"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 크래시 리포팅은 가장 먼저. 부팅 중에 죽는 것도 보고 싶습니다.
+    observability.init()
+
     # Alembic owns the schema in production; this keeps `make dev` and the
     # tests one command instead of three.
     if settings.env != "prod":
@@ -44,6 +48,7 @@ async def lifespan(app: FastAPI):
             log.info("seeded reference data: %s", counts)
 
     log.info("vision provider: %s", get_provider().name)
+    log.info("push provider: %s", push.get_provider().name)
 
     worker_task: asyncio.Task | None = None
     stop = asyncio.Event()

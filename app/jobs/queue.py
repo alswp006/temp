@@ -19,6 +19,7 @@ from datetime import timedelta
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import observability
 from app.config import settings
 from app.core.timeutil import utcnow
 from app.db import session_scope
@@ -126,6 +127,9 @@ async def _execute(job: Job) -> None:
             await handler(db, payload)
     except Exception as exc:  # noqa: BLE001 - the queue is the boundary
         log.exception("job %s (%s) 실패", job.id, job.kind)
+        # 잡 실패는 사용자에게 "분석 실패"로 보이는 지점입니다. 로그만
+        # 남기면 아무도 안 봅니다.
+        observability.capture(exc, job_kind=job.kind, job_id=job.id)
         async with session_scope() as db:
             row = await db.get(Job, job.id)
             if row is None:

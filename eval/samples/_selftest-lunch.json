@@ -1,0 +1,34 @@
+{
+  "meal_type": "lunch",
+  "menu": [
+    {
+      "name": "잡곡밥",
+      "category": "rice",
+      "standard_g": 210
+    },
+    {
+      "name": "된장찌개",
+      "category": "soup",
+      "standard_g": 250
+    },
+    {
+      "name": "제육볶음",
+      "category": "main",
+      "standard_g": 120
+    }
+  ],
+  "truth": [
+    {
+      "name": "잡곡밥",
+      "grams": 190
+    },
+    {
+      "name": "된장찌개",
+      "grams": 230
+    },
+    {
+      "name": "제육볶음",
+      "grams": 110
+    }
+  ]
+}

@@ -17,6 +17,7 @@ from app.models import (
     FoodCategory,
     GoalType,
     MealStatus,
+    DevicePlatform,
     MealType,
     MentorshipStatus,
     MentorType,
@@ -516,6 +517,20 @@ class FoodMatchOut(BaseModel):
     score: float
 
 
+class DeviceRegister(BaseModel):
+    token: str = Field(min_length=8, max_length=255)
+    platform: DevicePlatform = DevicePlatform.IOS
+    app_version: str | None = Field(default=None, max_length=32)
+
+
+class DeviceOut(ORMModel):
+    id: int
+    platform: DevicePlatform
+    app_version: str | None
+    last_seen_at: datetime
+    created_at: datetime
+
+
 class NotificationOut(ORMModel):
     id: int
     kind: str
@@ -523,6 +538,7 @@ class NotificationOut(ORMModel):
     body: str | None
     payload: dict
     read_at: datetime | None
+    pushed_at: datetime | None
     created_at: datetime
 
 

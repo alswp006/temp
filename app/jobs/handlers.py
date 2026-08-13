@@ -15,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.timeutil import today_local, utcnow, week_start
 from app.db import session_scope
 from app.jobs.queue import register
+from app.services.notify import notify
+from app.services.push import deliver
 from app.models import (
     Battle,
     BattleStatus,
@@ -56,14 +58,13 @@ async def analyze_meal_job(db: AsyncSession, payload: dict) -> None:
         raise
 
     await db.refresh(meal, ["items"])
-    db.add(
-        Notification(
-            user_id=meal.user_id,
-            kind="meal_ready",
-            title="식사 분석 완료",
-            body=f"{meal.kcal:.0f}kcal · 단백질 {meal.protein_g:.0f}g",
-            payload={"meal_id": meal.id},
-        )
+    await notify(
+        db,
+        user_id=meal.user_id,
+        kind="meal_ready",
+        title="식사 분석 완료",
+        body=f"{meal.kcal:.0f}kcal · 단백질 {meal.protein_g:.0f}g",
+        payload={"meal_id": meal.id},
     )
 
 
@@ -78,17 +79,16 @@ async def refresh_targets_job(db: AsyncSession, payload: dict) -> None:
     )
     for user in filter(None, users):
         target = await targets.refresh_target(db, user)
-        db.add(
-            Notification(
-                user_id=user.id,
-                kind="target_updated",
-                title="이번 주 목표가 갱신되었습니다",
-                body=(
-                    f"목표 {target.target_kcal:.0f}kcal · "
-                    f"단백질 {target.target_protein_g:.0f}g"
-                ),
-                payload={"target_id": target.id, "method": target.method},
-            )
+        await notify(
+            db,
+            user_id=user.id,
+            kind="target_updated",
+            title="이번 주 목표가 갱신되었습니다",
+            body=(
+                f"목표 {target.target_kcal:.0f}kcal · "
+                f"단백질 {target.target_protein_g:.0f}g"
+            ),
+            payload={"target_id": target.id, "method": target.method},
         )
 
 
@@ -121,14 +121,13 @@ async def weekly_report_job(db: AsyncSession, payload: dict) -> None:
         end = today_local(user.timezone)
         start = week_start(end) - timedelta(days=7)
         report = await reports.weekly_report(db, user, start=start, end=start + timedelta(days=6))
-        db.add(
-            Notification(
-                user_id=user.id,
-                kind="weekly_report",
-                title="주간 리포트",
-                body=report.summary_line(),
-                payload=report.to_dict(),
-            )
+        await notify(
+            db,
+            user_id=user.id,
+            kind="weekly_report",
+            title="주간 리포트",
+            body=report.summary_line(),
+            payload=report.to_dict(),
         )
 
 
@@ -140,3 +139,15 @@ async def verify_menu_plan_job(db: AsyncSession, payload: dict) -> None:
         return
     plan.verified = False
     plan.created_at = plan.created_at or utcnow()
+
+
+@register("push_notification")
+async def push_notification_job(db: AsyncSession, payload: dict) -> None:
+    """알림 한 건을 그 사용자의 기기들로 보냅니다.
+
+    잡으로 빼 둔 이유: FCM이 느린 날 사용자의 저장 버튼까지 같이 느려지면
+    안 되고, 실패해도 큐가 재시도해 주기 때문입니다.
+    """
+    sent = await deliver(db, int(payload["notification_id"]))
+    if sent:
+        log.info("푸시 %d대 발송 (notification=%s)", sent, payload["notification_id"])

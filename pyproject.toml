@@ -27,6 +27,9 @@ dependencies = [
 
 [project.optional-dependencies]
 postgres = ["asyncpg>=0.29"]
+# 크래시 리포팅. 없으면 app/observability.py가 조용히 비활성됩니다 —
+# DSN을 안 넣은 개발 환경에서 의존성까지 받게 만들 이유가 없습니다.
+sentry = ["sentry-sdk[fastapi]>=2.0"]
 anthropic = ["anthropic>=0.40"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 

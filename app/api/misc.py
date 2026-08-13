@@ -11,6 +11,7 @@ from app.core.deps import CurrentUser, DbSession
 from app.core.timeutil import today_local, utcnow
 from app.errors import Forbidden, NotFound
 from app.models import (
+    DeviceToken,
     Food,
     Job,
     JobStatus,
@@ -22,6 +23,8 @@ from app.models import (
 )
 from app.schemas import (
     AuditLogOut,
+    DeviceOut,
+    DeviceRegister,
     FoodMatchOut,
     FoodOut,
     NotificationOut,
@@ -170,6 +173,65 @@ async def mark_read(user: CurrentUser, db: DbSession) -> Ok:
     now = utcnow()
     for row in rows:
         row.read_at = now
+    return Ok()
+
+
+# --- 푸시 기기 --------------------------------------------------------------
+
+
+@router.post("/devices", response_model=DeviceOut, status_code=201)
+async def register_device(
+    payload: DeviceRegister, user: CurrentUser, db: DbSession
+) -> DeviceOut:
+    """푸시 토큰 등록. 앱이 뜰 때마다 부릅니다.
+
+    토큰이 유일키인 이유: 기기를 남에게 넘기고 그 사람이 로그인하면 같은
+    토큰이 새 주인에게 붙어야 하고, 이전 사용자에게 알림이 가면 안 됩니다.
+    그래서 있으면 소유자를 갱신하고, 없으면 만듭니다.
+    """
+    row = (
+        await db.execute(
+            select(DeviceToken).where(DeviceToken.token == payload.token)
+        )
+    ).scalar_one_or_none()
+
+    if row is None:
+        row = DeviceToken(
+            user_id=user.id,
+            token=payload.token,
+            platform=payload.platform,
+            app_version=payload.app_version,
+        )
+        db.add(row)
+    else:
+        row.user_id = user.id
+        row.platform = payload.platform
+        row.app_version = payload.app_version
+        row.revoked_at = None  # 다시 살아났습니다
+    row.last_seen_at = utcnow()
+    await db.flush()
+    return DeviceOut.model_validate(row)
+
+
+@router.get("/devices", response_model=list[DeviceOut])
+async def list_devices(user: CurrentUser, db: DbSession) -> list[DeviceOut]:
+    rows = (
+        await db.execute(
+            select(DeviceToken)
+            .where(DeviceToken.user_id == user.id, DeviceToken.revoked_at.is_(None))
+            .order_by(DeviceToken.last_seen_at.desc())
+        )
+    ).scalars().all()
+    return [DeviceOut.model_validate(r) for r in rows]
+
+
+@router.delete("/devices/{device_id}", response_model=Ok)
+async def revoke_device(device_id: int, user: CurrentUser, db: DbSession) -> Ok:
+    """로그아웃할 때 부릅니다. 안 부르면 남의 기기로 내 알림이 갑니다."""
+    row = await db.get(DeviceToken, device_id)
+    if row is None or row.user_id != user.id:
+        raise NotFound("기기를 찾을 수 없습니다.")
+    row.revoked_at = utcnow()
     return Ok()
 
 

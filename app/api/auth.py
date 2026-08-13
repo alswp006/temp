@@ -20,6 +20,7 @@ from app.core.security import (
 from app.core.timeutil import utcnow
 from app.errors import NotFound, RateLimited, Unauthorized
 from app.models import ApiToken, LoginCode, User
+from app.services import mailer
 from app.schemas import (
     ApiTokenCreate,
     ApiTokenCreated,
@@ -65,13 +66,22 @@ async def request_code(payload: LoginRequest, db: DbSession) -> LoginRequestResp
         )
     )
 
+    sent = await mailer.send(mailer.login_code_mail(email, code))
     if settings.expose_login_code:
-        log.info("[dev] login code for %s: %s", email, code)
-    else:  # pragma: no cover - requires SMTP
-        log.info("login code issued for %s", email)
+        # 개발 환경: 메일 서버 없이도 들어올 수 있게 코드를 돌려줍니다.
+        log.info("[dev] login code for %s: %s", mailer.mask_email(email), code)
+    elif not sent:
+        # 프로덕션에서 메일이 안 나가면 사용자는 들어올 방법이 없습니다.
+        # 요청 자체는 성공으로 두되(코드는 이미 저장됐고 재시도가 가능해야
+        # 합니다) 로그에는 크게 남깁니다.
+        log.error(
+            "로그인 코드를 보내지 못했습니다 (%s). SMTP 설정을 확인하세요.",
+            mailer.mask_email(email),
+        )
 
     return LoginRequestResponse(
-        sent=True, dev_code=code if settings.expose_login_code else None
+        sent=sent or settings.expose_login_code,
+        dev_code=code if settings.expose_login_code else None,
     )
 
 

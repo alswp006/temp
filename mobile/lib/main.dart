@@ -22,6 +22,8 @@ import 'features/more_screen.dart';
 import 'features/permissions_screen.dart';
 import 'features/today_screen.dart';
 import 'features/week_screen.dart';
+import 'services/crash.dart';
+import 'services/push_client.dart';
 import 'shell.dart';
 import 'theme/app_theme.dart';
 import 'web_fonts.dart';
@@ -44,17 +46,29 @@ const _apiBase = String.fromEnvironment(
 const _e2e = bool.fromEnvironment('SIKPAN_E2E');
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  if (_e2e) SemanticsBinding.instance.ensureSemantics();
-  await initializeDateFormatting('ko_KR');
-  await loadKoreanFontsIfWeb();
+  // 크래시 리포터가 앱 전체를 감쌉니다. 이 밖에서 나는 예외는 보고되지
+  // 않으므로 부팅 코드도 안쪽에 둡니다.
+  await Crash.run(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (_e2e) SemanticsBinding.instance.ensureSemantics();
+    await initializeDateFormatting('ko_KR');
+    await loadKoreanFontsIfWeb();
 
-  final session = Session();
-  await session.restore();
-  final api = ApiClient(baseUrl: _apiBase, session: session);
-  final outbox = Outbox(api);
+    final session = Session();
+    await session.restore();
+    final api = ApiClient(baseUrl: _apiBase, session: session);
+    final outbox = Outbox(api);
+    final push = PushClient(api);
 
-  runApp(SikpanApp(session: session, api: api, outbox: outbox));
+    Crash.setUser(session.user?.id);
+
+    runApp(SikpanApp(
+      session: session,
+      api: api,
+      outbox: outbox,
+      push: push,
+    ));
+  });
 }
 
 class SikpanApp extends StatefulWidget {
@@ -63,11 +77,13 @@ class SikpanApp extends StatefulWidget {
     required this.session,
     required this.api,
     required this.outbox,
+    required this.push,
   });
 
   final Session session;
   final ApiClient api;
   final Outbox outbox;
+  final PushClient push;
 
   @override
   State<SikpanApp> createState() => _SikpanAppState();
@@ -82,6 +98,11 @@ class _SikpanAppState extends State<SikpanApp> {
     super.initState();
     _router = buildRouter(widget.session);
 
+    // 로그인 상태에서만 기기를 등록합니다. 로그아웃 상태에서 등록하면
+    // 누구에게 보낼지 알 수 없습니다.
+    if (widget.session.isLoggedIn) widget.push.start();
+    widget.session.addListener(_onSessionChanged);
+
     // 연결이 돌아오면 밀린 사진을 올립니다. 사용자가 아무것도 안 해도
     // 지하에서 찍은 식판이 지상에서 저절로 기록됩니다.
     _connectivity = Connectivity().onConnectivityChanged.listen((results) {
@@ -93,8 +114,16 @@ class _SikpanAppState extends State<SikpanApp> {
     });
   }
 
+  void _onSessionChanged() {
+    Crash.setUser(widget.session.user?.id);
+    if (widget.session.isLoggedIn && !widget.push.isReady) {
+      widget.push.start();
+    }
+  }
+
   @override
   void dispose() {
+    widget.session.removeListener(_onSessionChanged);
     _connectivity?.cancel();
     widget.api.close();
     super.dispose();

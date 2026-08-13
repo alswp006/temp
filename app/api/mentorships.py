@@ -34,6 +34,7 @@ from app.schemas import (
     PermissionUpdate,
 )
 from app.services import audit, permissions, reports
+from app.services.notify import notify
 
 router = APIRouter(prefix="/mentorships", tags=["mentorships"])
 
@@ -141,14 +142,13 @@ async def accept_invite(
         entity_id=m.id,
         after={k.value: v for k, v in payload.permissions.items()},
     )
-    db.add(
-        Notification(
-            user_id=m.mentor_id,
-            kind="mentorship_accepted",
-            title="멘티가 연결을 수락했습니다",
-            body=user.nickname,
-            payload={"mentorship_id": m.id},
-        )
+    await notify(
+        db,
+        user_id=m.mentor_id,
+        kind="mentorship_accepted",
+        title="멘티가 연결을 수락했습니다",
+        body=user.nickname,
+        payload={"mentorship_id": m.id},
     )
     return await _out(db, m)
 

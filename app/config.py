@@ -40,6 +40,36 @@ class Settings(BaseSettings):
     # log in without an SMTP server. Never enable this in prod.
     expose_login_code: bool = True
 
+    # --- mail -------------------------------------------------------------
+    # Without these the login code only reaches the log, which means nobody
+    # outside the machine running the server can sign in. This is the single
+    # thing that has to be configured before a real user exists.
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_starttls: bool = True
+    smtp_ssl: bool = False
+    mail_from: str = "식판 <no-reply@sikpan.app>"
+    mail_timeout_seconds: float = 15.0
+
+    # --- push -------------------------------------------------------------
+    # FCM은 iOS(APNs 경유)와 안드로이드를 한 경로로 처리합니다. 서비스 계정
+    # JSON 경로만 주면 되고, 없으면 푸시는 조용히 비활성입니다 — 알림은
+    # 여전히 DB에 쌓이고 앱을 열면 보입니다.
+    push_provider: Literal["fcm", "noop"] = "noop"
+    fcm_credentials_file: Path | None = None
+    fcm_project_id: str | None = None
+    push_timeout_seconds: float = 10.0
+
+    # --- 관측 -------------------------------------------------------------
+    # DSN이 없으면 통째로 비활성입니다. 실기기에서 뭐가 깨지는지 모르는 채로
+    # 운영하지 않기 위한 최소 장치입니다.
+    sentry_dsn: str | None = None
+    sentry_traces_sample_rate: float = 0.0
+    sentry_send_default_pii: bool = False
+    release: str = "0.1.0"
+
     # --- storage ----------------------------------------------------------
     media_root: Path = REPO_ROOT / "var" / "media"
     max_upload_bytes: int = 12 * 1024 * 1024
