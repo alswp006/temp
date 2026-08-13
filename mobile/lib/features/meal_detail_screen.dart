@@ -7,6 +7,7 @@ import '../api/models.dart';
 import '../app_state.dart';
 import '../theme/tokens.dart';
 import '../ui/labels.dart';
+import '../ui/meal_photo.dart';
 import '../ui/widgets.dart';
 
 class MealDetailScreen extends StatefulWidget {
@@ -223,6 +224,8 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
               : ScreenBody(
                   onRefresh: _load,
                   children: [
+                    if (meal.photoPath != null)
+                      MealPhoto(path: meal.photoPath!),
                     if (meal.openMode)
                       const NoticeBanner(
                           '이 끼니의 식단표가 없어 열린 인식 모드로 분석했습니다. '

@@ -40,14 +40,15 @@ class _BattleScreenState extends State<BattleScreen> {
           .map((e) => Battle.fromJson(e as Map<String, dynamic>))
           .toList();
 
-      final loaded = <(Battle, List<LeaderboardRow>)>[];
-      for (final battle in list) {
-        final board =
-            (await api.get('/battles/${battle.id}/leaderboard') as List)
-                .map((e) => LeaderboardRow.fromJson(e as Map<String, dynamic>))
-                .toList();
-        loaded.add((battle, board));
-      }
+      // 리더보드는 배틀마다 하나씩이지만 서로 무관합니다. 순차로 돌면
+      // 배틀 다섯 개에 왕복 여섯 번이 직렬로 쌓입니다.
+      final boards = await Future.wait(list.map((battle) async =>
+          (await api.get('/battles/${battle.id}/leaderboard') as List)
+              .map((e) => LeaderboardRow.fromJson(e as Map<String, dynamic>))
+              .toList()));
+      final loaded = [
+        for (var i = 0; i < list.length; i++) (list[i], boards[i]),
+      ];
       if (!mounted) return;
       setState(() {
         _battles = loaded;

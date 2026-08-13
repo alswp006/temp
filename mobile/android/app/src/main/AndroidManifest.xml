@@ -1,6 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 서버에 사진을 올려야 하므로 인터넷은 필수입니다. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 연결이 돌아왔을 때 밀린 사진을 보내기 위해 상태를 봅니다. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Android 13(API 33)부터 이미지 접근은 READ_MEDIA_IMAGES입니다.
+         그 이전 버전은 READ_EXTERNAL_STORAGE를 씁니다. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <application
-        android:label="sikpan_app"
+        android:label="식판"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -115,6 +115,7 @@ class Meal {
     required this.openMode,
     required this.error,
     required this.loggedByName,
+    required this.photoPath,
     required this.items,
   });
 
@@ -132,6 +133,7 @@ class Meal {
   final bool openMode;
   final String? error;
   final String? loggedByName;
+  final String? photoPath;
   final List<MealItem> items;
 
   bool get isReady => status == 'ready';
@@ -155,6 +157,7 @@ class Meal {
         openMode: j['open_mode'] == true,
         error: j['error'] as String?,
         loggedByName: j['logged_by_name'] as String?,
+        photoPath: j['photo_path'] as String?,
         items: ((j['items'] as List?) ?? const [])
             .map((e) => MealItem.fromJson(e as Map<String, dynamic>))
             .toList(),

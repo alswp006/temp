@@ -55,29 +55,40 @@ class _MoreScreenState extends State<MoreScreen> {
 
   Future<void> _load() async {
     final api = context.api;
-    final me = await _try(() async =>
-        User.fromJson(await api.get('/auth/me') as Map<String, dynamic>));
-    final canteens = await _try(() async => (await api.get('/canteens') as List)
-        .map((e) => Canteen.fromJson(e as Map<String, dynamic>))
-        .toList());
-    final mentorships = await _try(() async =>
-        (await api.get('/mentorships') as List)
-            .map((e) => Mentorship.fromJson(e as Map<String, dynamic>))
-            .toList());
-    final dashboard = await _try(() async =>
-        (await api.get('/mentorships/dashboard') as List)
-            .map((e) => MenteeCard.fromJson(e as Map<String, dynamic>))
-            .toList());
-    final notifications = await _try(() async =>
-        (await api.get('/notifications', query: {'limit': 8}) as List)
-            .map((e) => AppNotification.fromJson(e as Map<String, dynamic>))
-            .toList());
-    final target = await _try(() async {
-      final json = await api.get('/targets/current');
-      return json == null
-          ? null
-          : Target.fromJson(json as Map<String, dynamic>);
-    });
+
+    // 여섯 개를 한꺼번에 던집니다. 순차로 기다리면 지하철에서 왕복 6번이
+    // 그대로 더해져 화면이 몇 초씩 비어 있게 됩니다. 서로 의존하지 않으므로
+    // 기다릴 이유가 없습니다.
+    final results = await Future.wait([
+      _try(() async =>
+          User.fromJson(await api.get('/auth/me') as Map<String, dynamic>)),
+      _try(() async => (await api.get('/canteens') as List)
+          .map((e) => Canteen.fromJson(e as Map<String, dynamic>))
+          .toList()),
+      _try(() async => (await api.get('/mentorships') as List)
+          .map((e) => Mentorship.fromJson(e as Map<String, dynamic>))
+          .toList()),
+      _try(() async => (await api.get('/mentorships/dashboard') as List)
+          .map((e) => MenteeCard.fromJson(e as Map<String, dynamic>))
+          .toList()),
+      _try(() async =>
+          (await api.get('/notifications', query: {'limit': 8}) as List)
+              .map((e) => AppNotification.fromJson(e as Map<String, dynamic>))
+              .toList()),
+      _try(() async {
+        final json = await api.get('/targets/current');
+        return json == null
+            ? null
+            : Target.fromJson(json as Map<String, dynamic>);
+      }),
+    ]);
+
+    final me = results[0] as User?;
+    final canteens = results[1] as List<Canteen>?;
+    final mentorships = results[2] as List<Mentorship>?;
+    final dashboard = results[3] as List<MenteeCard>?;
+    final notifications = results[4] as List<AppNotification>?;
+    final target = results[5] as Target?;
 
     if (!mounted) return;
     if (me != null) await context.session.updateUser(me);

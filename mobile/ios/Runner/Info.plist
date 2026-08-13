@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Sikpan App</string>
+	<string>식판</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>식판을 찍어 식사를 기록합니다. 사진은 분석 후 서버에 보관되며, 연결한 사람에게도 별도 권한을 켠 경우에만 보입니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>앨범에서 식판·식단표·운동 수첩 사진을 골라 기록합니다.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>기록한 사진을 앨범에 저장합니다.</string>
 </dict>
 </plist>
