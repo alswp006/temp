@@ -84,3 +84,30 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://sikpan:sikpan@localhost:5432/sikpan
           SECRET_KEY: ci-secret
         run: alembic upgrade head
+
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.0"
+          channel: stable
+          cache: true
+
+      - name: Analyze
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter analyze
+
+      - name: Test
+        working-directory: mobile
+        run: flutter test
+
+      # 웹 빌드는 컴파일 회귀를 잡는 가장 싼 방법입니다. iOS는 macOS 러너가
+      # 있어야 하고, 안드로이드 APK는 SDK 내려받느라 몇 분이 더 듭니다.
+      # --no-web-resources-cdn: CanvasKit을 CDN 대신 번들에 넣습니다.
+      - name: Build web
+        working-directory: mobile
+        run: flutter build web --no-web-resources-cdn
