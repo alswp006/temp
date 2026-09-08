@@ -23,7 +23,7 @@ services:
         condition: service_healthy
     environment:
       ENV: ${ENV:-dev}
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY를 .env에 설정하십시오}
       DATABASE_URL: postgresql+asyncpg://sikpan:sikpan@db:5432/sikpan
       MEDIA_ROOT: /srv/var/media
       VISION_PROVIDER: ${VISION_PROVIDER:-stub}
@@ -44,7 +44,7 @@ services:
     command: ["python", "-m", "app.jobs.worker"]
     environment:
       ENV: ${ENV:-dev}
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY를 .env에 설정하십시오}
       DATABASE_URL: postgresql+asyncpg://sikpan:sikpan@db:5432/sikpan
       MEDIA_ROOT: /srv/var/media
       VISION_PROVIDER: ${VISION_PROVIDER:-stub}

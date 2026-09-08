@@ -67,8 +67,10 @@ async def request_code(payload: LoginRequest, db: DbSession) -> LoginRequestResp
     )
 
     sent = await mailer.send(mailer.login_code_mail(email, code))
-    if settings.expose_login_code:
-        # 개발 환경: 메일 서버 없이도 들어올 수 있게 코드를 돌려줍니다.
+    if settings.env != "prod":
+        # 개발·테스트: 메일 서버가 없어도 들어올 수 있게 로그에 남깁니다.
+        # 응답에 실을지는 EXPOSE_LOGIN_CODE가 따로 정합니다 — 로그는 서버를
+        # 띄운 사람만 보지만 응답은 네트워크 너머 누구든 봅니다.
         log.info("[dev] login code for %s: %s", mailer.mask_email(email), code)
     elif not sent:
         # 프로덕션에서 메일이 안 나가면 사용자는 들어올 방법이 없습니다.
@@ -105,7 +107,12 @@ async def verify(payload: LoginVerify, db: DbSession) -> TokenResponse:
     if record.attempts >= settings.login_code_max_attempts:
         raise RateLimited("시도 횟수를 초과했습니다. 코드를 다시 요청해 주세요.")
 
+    # 실패 응답은 예외로 나가고, 예외가 나면 get_session이 요청 세션을 통째로
+    # 롤백합니다. 여기서 커밋하지 않으면 이 증가분이 함께 사라져 바로 위의 5회
+    # 제한이 영원히 발동하지 않습니다 — 6자리 코드를 무제한 대입할 수 있었습니다.
     record.attempts += 1
+    await db.commit()
+
     if not verify_secret(payload.code, record.code_hash):
         raise Unauthorized("코드가 일치하지 않습니다.")
 

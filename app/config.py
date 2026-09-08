@@ -6,12 +6,13 @@ server behind a Cloudflare tunnel, and a managed cloud host.
 
 from __future__ import annotations
 
+import os
 import secrets
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -36,9 +37,14 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 60 * 24 * 14
     login_code_ttl_minutes: int = 15
     login_code_max_attempts: int = 5
-    # In dev the magic-link code is returned in the API response so you can
-    # log in without an SMTP server. Never enable this in prod.
-    expose_login_code: bool = True
+    # 로그인 코드를 API 응답에 실어 보냅니다. SMTP 없이 로그인하려고 둔
+    # 개발 편의 기능인데, 기본값이 True였기 때문에 compose를 쓰지 않고
+    # uvicorn으로 직접 띄운 배포는 OTP를 그대로 응답에 노출하고 있었습니다.
+    # 기본값은 끔. 켜려면 EXPOSE_LOGIN_CODE=true를 명시하십시오
+    # (프로덕션에서는 명시해도 거부합니다 — 아래 _harden 참고).
+    # 서버 로그에는 프로덕션이 아닌 한 항상 찍히므로, `make dev`는 그대로
+    # 터미널에서 코드를 보고 로그인할 수 있습니다.
+    expose_login_code: bool = False
 
     # --- mail -------------------------------------------------------------
     # Without these the login code only reaches the log, which means nobody
@@ -113,6 +119,31 @@ class Settings(BaseSettings):
     # --- integrations -----------------------------------------------------
     telegram_bot_token: str | None = None
     telegram_webhook_secret: str | None = None
+
+    @model_validator(mode="after")
+    def _harden(self) -> "Settings":
+        """프로덕션에서 조용히 위험해지는 기본값을 여기서 막습니다.
+
+        기본값 하나하나가 각자 안전한 것보다, 위험한 조합을 한곳에서 거절하는
+        편이 놓치기 어렵습니다.
+        """
+        if self.env == "prod":
+            if self.expose_login_code:
+                raise ValueError(
+                    "EXPOSE_LOGIN_CODE는 프로덕션에서 켤 수 없습니다. "
+                    "로그인 코드가 API 응답에 그대로 실려 나갑니다."
+                )
+            if "SECRET_KEY" not in os.environ:
+                # 기본값은 프로세스마다 새로 만들어집니다. 재시작하면 모든
+                # 토큰이 무효가 되고, 워커를 여러 개 띄우면 워커마다 키가 달라
+                # 무작위로 401이 납니다.
+                raise ValueError(
+                    "프로덕션에서는 SECRET_KEY를 환경변수로 고정해야 합니다."
+                )
+        elif self.env == "test":
+            # 테스트에는 메일 서버가 없습니다.
+            self.expose_login_code = True
+        return self
 
     @field_validator("media_root", mode="after")
     @classmethod
