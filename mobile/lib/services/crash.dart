@@ -44,16 +44,15 @@ class Crash {
 
   static FutureOr<SentryEvent?> _scrub(SentryEvent event, Hint hint) {
     // 메시지에 섞여 들어간 이메일을 지웁니다.
+    // (sentry 9부터 이벤트 필드는 직접 대입합니다. copyWith는 deprecated.)
     final formatted = event.message?.formatted;
     if (formatted != null) {
-      event = event.copyWith(message: SentryMessage(_mask(formatted)));
+      event.message = SentryMessage(_mask(formatted));
     }
     // 사용자는 아이디로만. 이메일·IP는 남기지 않습니다.
     final user = event.user;
     if (user != null) {
-      event = event.copyWith(
-        user: SentryUser(id: user.id),
-      );
+      event.user = SentryUser(id: user.id);
     }
     return event;
   }

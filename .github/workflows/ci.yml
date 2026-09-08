@@ -111,3 +111,26 @@ jobs:
       - name: Build web
         working-directory: mobile
         run: flutter build web --no-web-resources-cdn
+
+  # iOS는 리눅스에서 컴파일할 수 없어서 오랫동안 검증 밖에 있었고, 그 사이
+  # sentry_flutter 8.14.2가 SwiftPM 경로에서 빌드를 깨뜨린 것을 아무도 몰랐다.
+  # (플러그인의 Package.swift가 sentry-cocoa를 상한 없이 열어 두어 새 패치
+  #  버전이 물리면서 API가 어긋났다.) 맥에서 사람이 돌려 보고서야 나왔다.
+  #
+  # 시뮬레이터 빌드는 서명이 필요 없으므로 비밀값 없이 돌아간다. 이것 하나로
+  # "iOS에서만 안 되는" 부류를 PR 단계에서 잡는다.
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.0"
+          channel: stable
+          cache: true
+
+      - name: Build iOS (simulator, unsigned)
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter build ios --simulator --debug
