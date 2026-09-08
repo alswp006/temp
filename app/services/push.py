@@ -191,13 +191,20 @@ async def close_provider() -> None:
 
 
 async def _sent_today(db: AsyncSession, user_id: int) -> int:
+    """최근 24시간에 **실제로 나간** 푸시 수.
+
+    pushed_at으로 세면 안 됩니다. 그 값은 상한에 걸려 안 보낸 알림과 기기가 없어
+    못 보낸 알림에도 찍히므로, 억제된 알림이 다음 알림을 다시 억제합니다. 하루
+    세 끼를 기록하는 사용자는 창 안의 개수가 2 밑으로 내려가지 않아 첫날 이후
+    푸시가 영구히 멈췄습니다.
+    """
     since = utcnow() - timedelta(days=1)
     rows = (
         await db.execute(
             select(Notification).where(
                 Notification.user_id == user_id,
                 Notification.created_at >= since,
-                Notification.pushed_at.is_not(None),
+                Notification.push_sent_at.is_not(None),
             )
         )
     ).scalars().all()
@@ -257,4 +264,7 @@ async def deliver(db: AsyncSession, notification_id: int) -> int:
             log.warning("푸시 실패 (device=%s): %s", device.id, exc)
 
     notification.pushed_at = utcnow()
+    # 한 대라도 실제로 받았을 때만 상한에 셉니다.
+    if sent > 0:
+        notification.push_sent_at = utcnow()
     return sent

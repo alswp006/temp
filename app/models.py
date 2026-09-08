@@ -903,6 +903,13 @@ class Notification(Base):
     body: Mapped[str | None] = mapped_column(Text)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # 푸시를 시도한 시각. 하루 상한을 세는 기준이자 재전송 방지입니다.
+    # 푸시를 시도한 시각. 같은 알림을 두 번 보내지 않기 위한 표시입니다.
     pushed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # 실제로 한 대 이상에 전달된 시각.
+    #
+    # 하루 상한은 반드시 이 값으로 세야 합니다. 예전에는 pushed_at으로 셌는데,
+    # 상한에 걸려 **안 보낸** 알림과 기기가 없어 **못 보낸** 알림에도 pushed_at을
+    # 찍었습니다. 그러면 억제된 알림이 다음 알림을 다시 억제해, 하루 세 끼를
+    # 기록하는 사용자는 첫날 이후 푸시가 영구히 멈췄습니다.
+    push_sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     created_at: Mapped[datetime] = _utcnow_col()

@@ -253,3 +253,82 @@ async def test_자격증명이_없으면_비활성이지만_알림은_남는다(
 
     r = await client.get("/api/notifications", headers=me["headers"])
     assert any(x["title"] == "확인" for x in r.json())
+
+
+@pytest.mark.asyncio
+async def test_억제된_알림이_다음_푸시를_막지_않는다(client, db, _fake_provider):
+    """상한이 '보낸 횟수'가 아니라 '시도한 횟수'를 세고 있었다.
+
+    억제된 알림에도 pushed_at을 찍었으므로, 그 값이 다음 알림을 다시 억제했다.
+    meal_ready는 끼니마다 발행되니 24시간 창 안에는 늘 세 건 이상이 있고,
+    그러면 개수가 2 밑으로 내려가지 않아 첫날 이후 푸시가 영원히 멈췄다.
+
+    실제로 나간 것만 창 밖으로 밀어내고, 억제된 것은 창 안에 남긴다. 이때도
+    다음 푸시가 나가야 한다 — 억제는 할당량을 쓰지 않기 때문이다.
+    """
+    from datetime import timedelta
+
+    from app.core.timeutil import utcnow
+
+    user_id = await _user_with_device(
+        db=db, client=client, email="window@example.com", token=fcm_token("tok-win")
+    )
+
+    for i in range(4):
+        n = await notify(db, user_id=user_id, kind="meal_ready", title=f"1일차 {i}")
+        await db.commit()
+        await push.deliver(db, n.id)
+        await db.commit()
+    assert len(_fake_provider.sent) == push.MAX_PUSH_PER_DAY
+
+    # 실제로 나간 두 건만 창 밖으로. 억제된 두 건은 그대로 창 안에 둔다.
+    rows = (
+        await db.execute(select(Notification).where(Notification.user_id == user_id))
+    ).scalars().all()
+    old = utcnow() - timedelta(days=2)
+    for r in rows:
+        if r.push_sent_at is not None:
+            r.created_at = old
+            r.push_sent_at = old
+    await db.commit()
+
+    before = len(_fake_provider.sent)
+    n = await notify(db, user_id=user_id, kind="meal_ready", title="다음 끼니")
+    await db.commit()
+    await push.deliver(db, n.id)
+    await db.commit()
+
+    assert len(_fake_provider.sent) - before == 1, (
+        "억제된 알림이 다음 푸시를 막았다 — 상한이 여전히 시도를 세고 있다"
+    )
+
+
+@pytest.mark.asyncio
+async def test_기기가_없으면_상한을_소진하지_않는다(client, db, _fake_provider):
+    """앱을 깔기 전에 쌓인 알림이 첫 진짜 푸시를 먹어 버리면 안 된다."""
+    r = await client.post("/api/auth/request-code", json={"email": "nodev@example.com"})
+    code = r.json()["dev_code"]
+    r = await client.post(
+        "/api/auth/verify", json={"email": "nodev@example.com", "code": code}
+    )
+    user_id = r.json()["user"]["id"]
+
+    for i in range(3):
+        n = await notify(db, user_id=user_id, kind="meal_ready", title=f"기기없음 {i}")
+        await db.commit()
+        await push.deliver(db, n.id)
+        await db.commit()
+
+    # 이제 기기를 등록하면 정상적으로 받아야 한다.
+    token = r.json()["access_token"]
+    await client.post(
+        "/api/devices",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"token": fcm_token("tok-late"), "platform": "ios"},
+    )
+    n = await notify(db, user_id=user_id, kind="meal_ready", title="첫 진짜 푸시")
+    await db.commit()
+    await push.deliver(db, n.id)
+    await db.commit()
+
+    assert len(_fake_provider.sent) == 1, "기기 없이 흘려보낸 알림이 상한을 먹었다"
