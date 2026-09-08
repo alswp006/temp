@@ -32,14 +32,40 @@ log = logging.getLogger("sikpan")
 WEB_DIR = REPO_ROOT / "web"
 
 
+def _upgrade_schema() -> None:
+    """`alembic upgrade head`를 인프로세스로 실행합니다.
+
+    컨테이너 엔트리포인트에 넣는 대신 여기 두는 이유는, 그러면 `make dev`,
+    도커, 배포가 전부 같은 것을 실행하기 때문입니다. 문서에 적힌 절차를 누가
+    빠뜨렸는지 추적할 필요가 없어집니다.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(REPO_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(REPO_ROOT / "migrations"))
+    command.upgrade(cfg, "head")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 크래시 리포팅은 가장 먼저. 부팅 중에 죽는 것도 보고 싶습니다.
     observability.init()
 
-    # Alembic owns the schema in production; this keeps `make dev` and the
-    # tests one command instead of three.
-    if settings.env != "prod":
+    # 스키마는 한 경로로만 만듭니다.
+    #
+    # 예전에는 prod가 아닐 때 create_all()을 부르고, prod에서는 아무것도 부르지
+    # 않았습니다. 그래서 두 가지가 동시에 깨졌습니다. 프로덕션은 마이그레이션을
+    # 실행하는 곳이 어디에도 없어 빈 스키마로 떴고, 개발에서는 create_all이 새
+    # 테이블만 만들고 새 컬럼은 못 만들어 — device_tokens는 생기고
+    # notifications.pushed_at은 없는 — alembic으로도 복구할 수 없는 반쪽 상태를
+    # 만들었습니다. 실제로 그 상태를 겪었습니다.
+    #
+    # alembic은 빈 DB면 전부 만들고, 뒤처진 DB면 따라잡고, 최신이면 즉시
+    # 끝납니다. 세 경우가 한 줄로 덮이므로 갈라질 일이 없습니다.
+    if settings.env != "test":
+        await asyncio.to_thread(_upgrade_schema)
+    else:
         await create_all()
 
     async with session_scope() as db:
