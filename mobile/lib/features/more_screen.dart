@@ -115,6 +115,19 @@ class _MoreScreenState extends State<MoreScreen> with DataListener<MoreScreen> {
     if (!mounted) return;
     if (me != null) await context.session.updateUser(me);
     if (!mounted) return;
+
+    // 고른 식당이 서버 목록에 없으면 선택을 버립니다. 선택은 기기에만 남으므로,
+    // 식당이 지워지거나 권한을 잃으면 사진 업로드가 계속 403으로 실패하는데
+    // 목록이 비어 있으면 화면에 '선택 안 함' 칩조차 없어 손으로 지울 수도
+    // 없습니다.
+    final selected = context.session.canteenId;
+    if (canteens != null &&
+        selected != null &&
+        !canteens.any((c) => c.id == selected)) {
+      await context.session.selectCanteen(null);
+      if (!mounted) return;
+    }
+
     setState(() {
       _me = me;
       _canteens = canteens ?? const [];

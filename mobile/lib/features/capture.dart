@@ -37,15 +37,32 @@ class MealCapture {
     showToast(context, '업로드 중…');
 
     try {
-      await scope.api.upload(
-        '/meals/photo',
-        bytes,
-        filename: 'meal.jpg',
-        fields: {
-          if (canteenId != null) 'canteen_id': '$canteenId',
-          'shot_at': shotAt.toUtc().toIso8601String(),
-        },
-      );
+      try {
+        await scope.api.upload(
+          '/meals/photo',
+          bytes,
+          filename: 'meal.jpg',
+          fields: {
+            if (canteenId != null) 'canteen_id': '$canteenId',
+            'shot_at': shotAt.toUtc().toIso8601String(),
+          },
+        );
+      } on ApiException catch (e) {
+        // 고른 식당이 서버에서 사라졌거나 권한을 잃으면 403이 납니다. 그런데
+        // 선택은 기기에만 남아 있어서, 목록이 비면 화면에서 지울 방법조차
+        // 없습니다. 그러면 사진을 찍을 때마다 영원히 실패합니다.
+        //
+        // 서버가 그 식당을 거절하면 선택을 버리고 한 번 더 보냅니다. 식당은
+        // 정확도를 올리는 장치일 뿐이고, 기록 자체를 막을 이유가 없습니다.
+        if (e.status != 403 || canteenId == null) rethrow;
+        await scope.session.selectCanteen(null);
+        await scope.api.upload(
+          '/meals/photo',
+          bytes,
+          filename: 'meal.jpg',
+          fields: {'shot_at': shotAt.toUtc().toIso8601String()},
+        );
+      }
       // 화면들이 스스로 다시 불러옵니다. 이게 없으면 서버에는 저장됐는데
       // 오늘 화면은 "0끼"인 채로 남습니다.
       scope.data.bump();

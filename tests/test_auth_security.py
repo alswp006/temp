@@ -83,3 +83,29 @@ def test_프로덕션도_비밀키를_고정하면_뜬다(monkeypatch):
 def test_개발_기본값은_코드를_응답에_싣지_않는다(monkeypatch):
     monkeypatch.delenv("EXPOSE_LOGIN_CODE", raising=False)
     assert Settings(env="dev").expose_login_code is False
+
+
+@pytest.mark.asyncio
+async def test_없는_식당으로_올리면_거절한다(client: AsyncClient, photo_bytes):
+    """앱은 고른 식당 id를 기기에 저장한다. 그 식당이 사라지면 서버는 403을
+    내는데, 앱에는 그 선택을 지울 방법이 없어 사진 업로드가 영구히 실패했다.
+    서버 쪽 계약을 고정해 두고, 클라이언트는 이 403을 보고 선택을 버린다."""
+    from tests.conftest import register
+
+    auth = await register(client, "canteen@example.com")
+    r = await client.post(
+        "/api/meals/photo",
+        headers=auth["headers"],
+        files={"file": ("tray.jpg", photo_bytes, "image/jpeg")},
+        data={"canteen_id": "99999"},
+    )
+    assert r.status_code == 403, r.text
+
+    # 식당 없이 보내면 통과해야 한다 — 식당은 정확도 장치이지 기록의 전제가
+    # 아니다. 클라이언트의 자가 복구가 이 경로로 재시도한다.
+    r = await client.post(
+        "/api/meals/photo",
+        headers=auth["headers"],
+        files={"file": ("tray.jpg", photo_bytes, "image/jpeg")},
+    )
+    assert r.status_code == 202, r.text
