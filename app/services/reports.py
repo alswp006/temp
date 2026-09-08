@@ -155,8 +155,23 @@ class WeeklyReport:
 
 
 async def weekly_report(
-    db: AsyncSession, user: User, *, start: date | None = None, end: date | None = None
+    db: AsyncSession,
+    user: User,
+    *,
+    start: date | None = None,
+    end: date | None = None,
+    include_weight: bool = True,
 ) -> WeeklyReport:
+    """주간 리포트.
+
+    [include_weight]가 왜 여기 있는가. 이 리포트를 남이 볼 수 있는 경로가
+    있는데(코치가 멘티의 주간을 본다), 권한 검사는 `diet:read` 하나만 하면서
+    응답에는 일자별 체중과 추세, 주간 변화량이 그대로 들어 있었습니다.
+    `GET /api/weights`는 403을 내는데 이쪽으로는 같은 숫자가 새어 나갔습니다.
+
+    호출부에서 걸러도 되지만, 그러면 다른 직렬화 경로가 생길 때마다 같은 실수를
+    반복하게 됩니다. 애초에 담지 않는 편이 안전합니다.
+    """
     today = today_local(user.timezone)
     start = start or week_start(today)
     end = end or min(start + timedelta(days=6), today)
@@ -164,6 +179,10 @@ async def weekly_report(
     report = WeeklyReport(start=start.isoformat(), end=end.isoformat())
 
     days = [await day_summary(db, user, d) for d in date_range(start, end)]
+    if not include_weight:
+        for d in days:
+            d.weight_kg = None
+            d.trend_kg = None
     report.days = [d.to_dict() for d in days]
     report.logged_days = sum(1 for d in days if d.meals or d.workouts)
 
@@ -264,7 +283,12 @@ async def weekly_report(
             .limit(1)
         )
     ).scalar_one_or_none()
-    if weight_start and weight_end and weight_start.id != weight_end.id:
+    if (
+        include_weight
+        and weight_start
+        and weight_end
+        and weight_start.id != weight_end.id
+    ):
         report.weight_change_kg = round(weight_end.trend_kg - weight_start.trend_kg, 2)
 
     est = await targets_service.estimate_tdee(db, user, as_of=end)

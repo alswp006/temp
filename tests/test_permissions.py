@@ -327,3 +327,85 @@ async def test_photo_scope_is_separate_from_diet_scope(client):
     r = await client.get(f"/api/media/{meal['photo_path']}", headers=mentee["headers"])
     assert r.status_code == 200
     assert r.headers["content-type"] == "image/jpeg"
+
+
+@pytest.mark.asyncio
+async def test_주간_리포트가_diet_read만으로_체중을_흘리지_않는다(client):
+    """`GET /api/weights`는 403을 내면서 주간 리포트로는 같은 숫자가 새고 있었다.
+
+    권한 검사가 DIET_READ 하나뿐인데 응답에는 일자별 weight_kg·trend_kg와
+    주간 weight_change_kg가 그대로 들어 있었다. 체중을 따로 떼어 둔 이 앱에서는
+    그 스코프 분리 자체가 무의미해지는 구멍이다.
+    """
+    mentee = await register(client, "wr-mentee@example.com")
+    coach = await register(client, "wr-coach@example.com")
+    await connect(client, coach, mentee, {"diet:read": True})  # 체중은 끔
+
+    r = await client.post(
+        "/api/weights", headers=mentee["headers"], json={"raw_kg": 81.5}
+    )
+    assert r.status_code == 201, r.text
+
+    r = await client.get(
+        f"/api/reports/weekly?user_id={mentee['user']['id']}",
+        headers=coach["headers"],
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert all(d.get("weight_kg") is None for d in body["days"]), body["days"]
+    assert all(d.get("trend_kg") is None for d in body["days"]), body["days"]
+    assert body.get("weight_change_kg") is None
+
+
+@pytest.mark.asyncio
+async def test_weight_read를_켜면_주간_리포트에_체중이_보인다(client):
+    """막는 것이 목적이 아니라 허락한 만큼만 보이게 하는 것이 목적이다."""
+    mentee = await register(client, "wr2-mentee@example.com")
+    coach = await register(client, "wr2-coach@example.com")
+    await connect(client, coach, mentee, {"diet:read": True, "weight:read": True})
+
+    await client.post("/api/weights", headers=mentee["headers"], json={"raw_kg": 70.2})
+
+    r = await client.get(
+        f"/api/reports/weekly?user_id={mentee['user']['id']}",
+        headers=coach["headers"],
+    )
+    assert r.status_code == 200, r.text
+    assert any(d.get("weight_kg") == 70.2 for d in r.json()["days"])
+
+
+@pytest.mark.asyncio
+async def test_내_리포트에는_내_체중이_보인다(client):
+    me = await register(client, "wr3@example.com")
+    await client.post("/api/weights", headers=me["headers"], json={"raw_kg": 64.0})
+    r = await client.get("/api/reports/weekly", headers=me["headers"])
+    assert any(d.get("weight_kg") == 64.0 for d in r.json()["days"])
+
+
+@pytest.mark.asyncio
+async def test_남의_식당_식단표_사진은_못_본다(client, photo_bytes):
+    """예전에는 경로가 `menu/`로 시작하기만 하면 로그인한 아무나 열 수 있었다.
+    소속되지 않은 식당의 사진까지 보였고, 경로에는 올린 사람의 id도 들어 있다."""
+    owner = await register(client, "menu-owner@example.com")
+    outsider = await register(client, "menu-outsider@example.com")
+
+    r = await client.post(
+        "/api/canteens", headers=owner["headers"], json={"name": "남의 식당"}
+    )
+    canteen_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/canteens/{canteen_id}/menu-board",
+        headers=owner["headers"],
+        files={"file": ("board.jpg", photo_bytes, "image/jpeg")},
+    )
+    assert r.status_code == 200, r.text
+    photo_path = r.json()["photo_path"]
+
+    # 올린 본인은 볼 수 있다.
+    r = await client.get(f"/api/media/{photo_path}", headers=owner["headers"])
+    assert r.status_code == 200, r.text
+
+    # 소속되지 않은 사람은 못 본다.
+    r = await client.get(f"/api/media/{photo_path}", headers=outsider["headers"])
+    assert r.status_code == 403, f"남의 식당 사진이 열렸다: {r.status_code}"

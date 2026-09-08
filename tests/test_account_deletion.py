@@ -176,3 +176,22 @@ async def test_아무도_없는_식당은_같이_지운다(client: AsyncClient, 
         json={"email": "solo@example.com"},
     )
     assert (await db.get(Canteen, canteen_id)) is None
+
+
+@pytest.mark.asyncio
+async def test_삭제_후_이메일이_남지_않는다(client: AsyncClient, db):
+    """login_codes는 users를 가리키지 않고 이메일 문자열만 들고 있다. 외래키가
+    없으니 CASCADE도 없고, 그대로 두면 '계정을 지웠다'고 해 놓고 주소가 DB에
+    남는다."""
+    from app.models import LoginCode
+
+    email = "trace@example.com"
+    auth = await register(client, email)
+    await client.request(
+        "DELETE", "/api/auth/me", headers=auth["headers"], json={"email": email}
+    )
+
+    rows = (
+        await db.execute(select(LoginCode).where(LoginCode.email == email))
+    ).scalars().all()
+    assert rows == [], "탈퇴 후에도 이메일이 login_codes에 남아 있다"

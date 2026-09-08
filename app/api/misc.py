@@ -13,6 +13,8 @@ from app.errors import Forbidden, NotFound
 from app.models import (
     DeviceToken,
     Food,
+    Membership,
+    MenuPlan,
     Job,
     JobStatus,
     Meal,
@@ -89,7 +91,15 @@ async def weekly(
         if found is None:
             raise NotFound("사용자를 찾을 수 없습니다.")
         target = found
-    report = await reports.weekly_report(db, target, start=start, end=end)
+
+    # 체중은 따로 켠 사람만 봅니다. diet:read는 식단을 여는 스코프이고,
+    # 체중을 여는 스코프는 weight:read로 나뉘어 있습니다.
+    include_weight = target.id == user.id or await permissions.can(
+        db, user.id, target.id, Scope.WEIGHT_READ
+    )
+    report = await reports.weekly_report(
+        db, target, start=start, end=end, include_weight=include_weight
+    )
     return report.to_dict()
 
 
@@ -268,8 +278,31 @@ async def get_media(path: str, user: CurrentUser, db: DbSession) -> Response:
     ).scalar_one_or_none()
     if meal is not None and meal.user_id != user.id:
         await permissions.require(db, user.id, meal.user_id, Scope.PHOTO_READ)
-    elif meal is None and not path.startswith(("menu/", f"meal/{user.id}/", f"workout/{user.id}/")):
-        raise Forbidden("이 파일에 접근할 권한이 없습니다.")
+    elif meal is None:
+        # 식단표 사진은 그 식당 사람들이 함께 씁니다. 예전에는 `menu/`로
+        # 시작하기만 하면 로그인한 아무나 열 수 있었는데, 그러면 소속되지도
+        # 않은 식당의 사진까지 보입니다. 경로에 올린 사람의 id가 들어 있기도
+        # 합니다.
+        plan = (
+            await db.execute(select(MenuPlan).where(MenuPlan.photo_path == path))
+        ).scalar_one_or_none()
+        if plan is not None:
+            member = (
+                await db.execute(
+                    select(Membership).where(
+                        Membership.canteen_id == plan.canteen_id,
+                        Membership.user_id == user.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if member is None:
+                raise Forbidden("이 식당의 식단표를 볼 권한이 없습니다.")
+        elif not path.startswith(
+            (f"meal/{user.id}/", f"workout/{user.id}/", f"menu/{user.id}/")
+        ):
+            # 저장되지 않은 파싱 초안 등, DB가 가리키지 않는 파일은 올린
+            # 본인만 볼 수 있습니다.
+            raise Forbidden("이 파일에 접근할 권한이 없습니다.")
 
     data = read_photo(path)
     if data is None:

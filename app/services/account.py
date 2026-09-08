@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models import (
     AuditLog,
+    LoginCode,
     Battle,
     BattleParticipant,
     Canteen,
@@ -155,7 +156,12 @@ async def delete_account(db: AsyncSession, user: User) -> None:
 
     await db.flush()
 
-    # ④ 나머지는 외래키 CASCADE가 데려갑니다 — 내 끼니·운동·체중·알림·기기
+    # ④ 로그인 코드는 users를 가리키지 않습니다. 이메일 문자열만 들고 있어서
+    #    외래키 CASCADE가 데려가지 않고, 그대로 두면 "계정을 지웠다"고 해 놓고
+    #    이메일 주소가 DB에 남습니다.
+    await db.execute(delete(LoginCode).where(LoginCode.email == user.email))
+
+    # ⑤ 나머지는 외래키 CASCADE가 데려갑니다 — 내 끼니·운동·체중·알림·기기
     #    토큰·연결·목표·보정 표본.
     await db.delete(user)
     await db.flush()
