@@ -797,7 +797,17 @@ class AuditLog(Base):
     __table_args__ = (Index("ix_audit_target_created", "target_user_id", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    actor_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # 행위자는 지워질 수 있습니다.
+    #
+    # 이 줄은 **당한 사람**의 기록입니다 — 누가 내 식단을 대신 고쳤는지 보는
+    # 근거이고, 앱이 약속한 안전장치 중 하나입니다. 행위자가 탈퇴했다고 그
+    # 기록까지 사라지면 멘티는 자기 데이터에 무슨 일이 있었는지 볼 수 없게
+    # 됩니다. 그렇다고 남겨 두면 탈퇴한 사람의 신원이 남습니다.
+    #
+    # 그래서 행을 남기고 사람만 지웁니다. 화면에는 "탈퇴한 사용자"로 보입니다.
+    actor_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
     target_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     action: Mapped[str] = mapped_column(String(40))  # create | update | delete | grant | revoke
     entity: Mapped[str] = mapped_column(String(40))

@@ -117,8 +117,15 @@ class ApiClient {
             body: jsonEncode(body ?? const {}),
           ));
 
-  Future<dynamic> delete(String path) =>
-      _send(() => _http.delete(_uri(path), headers: _headers()));
+  /// DELETE에도 본문을 실을 수 있습니다 — 계정 삭제가 확인용 이메일을
+  /// 함께 보냅니다.
+  Future<dynamic> delete(String path, {Object? body}) => _send(
+        () => _http.delete(
+          _uri(path),
+          headers: _headers(json: body != null),
+          body: body == null ? null : jsonEncode(body),
+        ),
+      );
 
   /// 사진 업로드. 서버는 multipart의 `file` 필드를 받습니다.
   Future<dynamic> upload(

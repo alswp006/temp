@@ -46,6 +46,16 @@ class LoginRequestResponse(BaseModel):
     dev_code: str | None = None
 
 
+class AccountDelete(BaseModel):
+    """계정 삭제 확인.
+
+    되돌릴 수 없는 동작이므로 자기 이메일을 다시 적게 합니다. 버튼 하나로
+    지워지면 오탭 한 번에 몇 달치 기록이 사라집니다.
+    """
+
+    email: EmailStr
+
+
 class LoginVerify(BaseModel):
     email: EmailStr
     code: str = Field(min_length=4, max_length=8)

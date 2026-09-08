@@ -19,10 +19,11 @@ from app.core.security import (
 )
 from app.core.ratelimit import SlidingWindow, client_key
 from app.core.timeutil import utcnow
-from app.errors import NotFound, RateLimited, Unauthorized
+from app.errors import Forbidden, NotFound, RateLimited, Unauthorized
 from app.models import ApiToken, LoginCode, User
-from app.services import mailer
+from app.services import account, mailer
 from app.schemas import (
+    AccountDelete,
     ApiTokenCreate,
     ApiTokenCreated,
     ApiTokenOut,
@@ -155,6 +156,28 @@ async def verify(payload: LoginVerify, db: DbSession) -> TokenResponse:
     return TokenResponse(
         access_token=create_access_token(user.id), user=UserOut.model_validate(user)
     )
+
+
+@router.delete("/me", response_model=Ok)
+async def delete_me(
+    payload: AccountDelete, user: CurrentUser, db: DbSession
+) -> Ok:
+    """계정과 내 데이터를 지웁니다. 되돌릴 수 없습니다.
+
+    App Store 심사지침 5.1.1(v)는 계정을 만들 수 있는 앱이라면 앱 안에서 지울
+    수도 있어야 한다고 요구합니다. 그 요구가 아니어도, 건강 데이터를 맡긴
+    사람이 되찾아 갈 방법은 있어야 합니다.
+
+    무엇을 남기는지는 app/services/account.py에 적어 두었습니다 — 내가 코치로서
+    남의 기록에 남긴 흔적은 그 사람 것이므로 지우지 않습니다.
+    """
+    if payload.email.lower() != user.email.lower():
+        # 이메일이 다르면 오탭이거나 남의 계정입니다. 어느 쪽이든 진행하지
+        # 않습니다.
+        raise Forbidden("이메일이 계정과 일치하지 않습니다.")
+
+    await account.delete_account(db, user)
+    return Ok()
 
 
 @router.get("/me", response_model=UserOut)

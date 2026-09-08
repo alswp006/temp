@@ -203,6 +203,7 @@ class _MoreScreenState extends State<MoreScreen> with DataListener<MoreScreen> {
         _Section(title: '계정', children: [
           _accountCard(me),
           _signOutCard(),
+          _deleteAccountCard(),
         ]),
         _footer(),
       ],
@@ -887,6 +888,117 @@ class _MoreScreenState extends State<MoreScreen> with DataListener<MoreScreen> {
         child: const Text('로그아웃'),
       ),
     );
+  }
+
+  /// 계정 삭제.
+  ///
+  /// 로그아웃과 나란히 두지 않고 한 칸 더 아래, 더 조용한 모양으로 둡니다.
+  /// 되돌릴 수 없는 것이 되돌릴 수 있는 것과 같은 무게로 보이면 안 됩니다.
+  /// 그래도 **찾을 수는 있어야** 합니다 — 앱 안에서 계정을 지울 수 없으면
+  /// App Store 심사(5.1.1(v))를 통과하지 못하고, 무엇보다 자기 건강 데이터를
+  /// 되찾아 갈 방법이 없는 앱이 됩니다.
+  Widget _deleteAccountCard() {
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.only(top: Dim.s4),
+      child: Center(
+        child: Pressable(
+          onTap: _deleteAccount,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: Dim.s16, vertical: Dim.s12),
+            child: Text(
+              '계정 삭제',
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: c.ink3,
+                decoration: TextDecoration.underline,
+                decorationColor: c.ink3.withValues(alpha: 0.4),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    final email = context.session.user?.email ?? '';
+    final controller = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final c = context.c;
+        return StatefulBuilder(
+          builder: (context, setLocal) => AlertDialog(
+            title: const Text('계정을 삭제할까요?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '식사·운동·체중·사진이 모두 지워집니다. 되돌릴 수 없습니다.\n\n'
+                  '코치로서 남긴 기록은 그 사람의 것이므로 지우지 않고, '
+                  '내가 만든 식당은 남은 사람에게 넘어갑니다.',
+                  style: TextStyle(fontSize: 14, height: 1.45, color: c.ink2),
+                ),
+                const SizedBox(height: Dim.s16),
+                Text('확인을 위해 이메일을 적어 주세요',
+                    style: TextStyle(fontSize: 12.5, color: c.ink3)),
+                const SizedBox(height: Dim.s8),
+                TextField(
+                  controller: controller,
+                  autocorrect: false,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(hintText: email),
+                  onChanged: (_) => setLocal(() {}),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                // 오탭 한 번에 몇 달치가 사라지지 않도록, 정확히 적었을 때만
+                // 눌립니다.
+                onPressed: controller.text.trim().toLowerCase() ==
+                        email.toLowerCase()
+                    ? () => Navigator.pop(context, true)
+                    : null,
+                style: FilledButton.styleFrom(backgroundColor: c.danger),
+                child: const Text('영구 삭제'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (ok != true || !mounted) return;
+
+    // 의존성은 await 전에 잡아 둡니다 — 다이얼로그가 닫힌 뒤의 context는
+    // 안전하지 않습니다.
+    final router = GoRouter.of(context);
+    final session = context.session;
+    final pushClient = context.pushClient;
+    final api = context.api;
+    try {
+      // 기기 해제가 먼저입니다 — 토큰이 살아 있을 때만 서버가 받아 줍니다.
+      await pushClient.unregister();
+      await api.delete('/auth/me', body: {'email': email});
+      await session.signOut();
+      router.go('/login');
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } on OfflineException {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('연결이 필요합니다.')),
+      );
+    }
   }
 
   Future<void> _signOut() async {
