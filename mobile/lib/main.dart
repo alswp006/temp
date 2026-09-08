@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:go_router/go_router.dart';
@@ -31,10 +32,16 @@ import 'web_fonts.dart';
 /// 서버 주소. 시뮬레이터는 맥의 localhost를 그대로 보지만, 실기기는 LAN
 /// 주소가 필요합니다:
 ///   flutter run --dart-define=SIKPAN_API=http://192.168.0.10:8000
-const _apiBase = String.fromEnvironment(
-  'SIKPAN_API',
-  defaultValue: 'http://localhost:8000',
-);
+///
+/// 릴리스에는 기본값이 없습니다. 예전에는 localhost가 기본값이라
+/// `--dart-define` 없이 만 릴리스 바이너리가 자기 폰의 8000번 포트를 두드렸고,
+/// 전 요청이 실패하는데 원인은 화면 어디에도 나오지 않았습니다. 값을 빠뜨리면
+/// 스토어에 올라간 뒤에야 알게 되므로, 빌드가 아니라 부팅에서 즉시 멈춥니다.
+const _apiBase = String.fromEnvironment('SIKPAN_API', defaultValue: _devApi);
+const _devApi = 'http://localhost:8000';
+
+/// 릴리스인데 주소를 안 넘겼는가.
+bool get _apiBaseMissing => kReleaseMode && _apiBase == _devApi;
 
 /// 브라우저에서 자동 검증할 때만 켭니다.
 ///
@@ -50,6 +57,14 @@ Future<void> main() async {
   // 않으므로 부팅 코드도 안쪽에 둡니다.
   await Crash.run(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    // 주소가 없으면 여기서 멈춥니다. 조용히 localhost로 떠서 전 요청이 실패하는
+    // 것보다, 빌드한 사람이 즉시 아는 편이 낫습니다.
+    assert(!_apiBaseMissing,
+        'SIKPAN_API를 넘기지 않았습니다: flutter build --dart-define=SIKPAN_API=https://…');
+    if (_apiBaseMissing) {
+      runApp(const _MisconfiguredApp());
+      return;
+    }
     if (_e2e) SemanticsBinding.instance.ensureSemantics();
     await initializeDateFormatting('ko_KR');
     await loadKoreanFontsIfWeb();
@@ -235,4 +250,42 @@ GoRouter buildRouter(Session session) {
       ),
     ],
   );
+}
+
+/// 서버 주소 없이 만들어진 릴리스 빌드에 뜨는 화면.
+///
+/// 흰 화면이나 끝없는 로딩 대신 무엇이 잘못됐는지 말합니다. 이 화면을 보는
+/// 사람은 사용자가 아니라 빌드를 만든 사람입니다.
+class _MisconfiguredApp extends StatelessWidget {
+  const _MisconfiguredApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(),
+      home: const Scaffold(
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.settings_ethernet_rounded, size: 40),
+                SizedBox(height: 16),
+                Text('서버 주소가 설정되지 않았습니다',
+                    style: TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w800)),
+                SizedBox(height: 8),
+                Text(
+                  '릴리스 빌드는 --dart-define=SIKPAN_API=… 가 필요합니다.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

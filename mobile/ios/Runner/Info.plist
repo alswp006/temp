@@ -72,5 +72,17 @@
 	<string>앨범에서 식판·식단표·운동 수첩 사진을 골라 기록합니다.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>기록한 사진을 앨범에 저장합니다.</string>
+	<!-- 개발 중 실기기에서 맥의 LAN 주소(http://192.168.x.x:8000)를 보려면
+	     필요합니다. ATS 기본값이 이걸 막고 있어서, README가 안내하는 실기기
+	     실행이 실제로는 동작하지 않았습니다.
+
+	     NSAllowsLocalNetworking은 사설 대역에만 평문을 허용합니다. 공개
+	     인터넷으로 나가는 http는 여전히 막히므로, 프로덕션은 HTTPS여야 한다는
+	     제약이 그대로 남습니다. NSAllowsArbitraryLoads를 쓰지 않은 이유입니다. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>
