@@ -137,33 +137,41 @@ class _Bar extends StatelessWidget {
     final c = context.c;
     final fill = over ? c.warn : c.accent;
 
+    // 폭에 상한을 둡니다. 주 초반이라 요일이 두세 개뿐일 때 막대가 칸을 가득
+    // 채우면 "막대"가 아니라 색 덩어리로 읽힙니다.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5),
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: empty ? 0 : ratio.clamp(0.0, 1.0)),
-        duration: Motion.count,
-        curve: Motion.emphasized,
-        builder: (_, v, __) => Container(
-          height: math.max(v * height, empty ? 3 : 4),
-          decoration: BoxDecoration(
-            gradient: empty
-                ? null
-                : LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [fill, fill.withValues(alpha: 0.68)],
-                  ),
-            color: empty ? c.line : null,
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: isToday && !empty && !c.isDark
-                ? [
-                    BoxShadow(
-                      color: fill.withValues(alpha: 0.30),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    )
-                  ]
-                : null,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 42),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: empty ? 0 : ratio.clamp(0.0, 1.0)),
+            duration: Motion.count,
+            curve: Motion.emphasized,
+            builder: (_, v, __) => Container(
+              height: math.max(v * height, empty ? 3 : 4),
+              decoration: BoxDecoration(
+                gradient: empty
+                    ? null
+                    : LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [fill, fill.withValues(alpha: 0.68)],
+                      ),
+                color: empty ? c.line : null,
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: isToday && !empty && !c.isDark
+                    ? [
+                        BoxShadow(
+                          color: fill.withValues(alpha: 0.30),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        )
+                      ]
+                    : null,
+              ),
+            ),
           ),
         ),
       ),
