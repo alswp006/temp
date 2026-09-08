@@ -71,10 +71,19 @@ class Outbox {
     onChanged?.call();
   }
 
-  /// 큐를 비웁니다. 보낸 개수를 돌려줍니다.
+  /// 서버가 이 사진을 영영 받지 않을 상태인가.
   ///
-  /// 네트워크로 실패한 항목은 큐에 남기고, 서버가 거절(4xx)한 항목은 버립니다.
-  /// 거절된 사진을 계속 재시도하면 영원히 빠지지 않습니다.
+  /// 이 한 줄이 "사진이 사라진다"와 "큐가 영원히 안 빠진다"를 가르므로,
+  /// 테스트가 직접 부를 수 있게 공개해 둡니다.
+  ///
+  /// 이런 항목을 계속 재시도하면 큐에서 영원히 빠지지 않습니다. 반대로 일시적인
+  /// 실패를 버리면 사용자의 사진이 사라집니다. 둘을 가르는 선입니다.
+  static bool isPermanentReject(int status) {
+    if (status == 401 || status == 408 || status == 429) return false;
+    return status >= 400 && status < 500;
+  }
+
+  /// 큐를 비웁니다. 보낸 개수를 돌려줍니다.
   Future<int> drain() async {
     final entries = await _entries();
     if (entries.isEmpty) return 0;
@@ -102,8 +111,20 @@ class Outbox {
       } on OfflineException {
         remaining.add(entry); // 아직 오프라인 — 다음 기회에.
       } on ApiException catch (e) {
-        debugPrint('outbox drop (${e.status}): ${e.message}');
-        await file.delete();
+        // ApiException은 400 이상 **전부**입니다. 예전에는 여기서 무조건
+        // 파일을 지웠기 때문에, 서버가 잠깐 500을 뱉거나 토큰이 만료돼 401이
+        // 나면 사용자가 찍어 둔 사진이 영구히 사라졌습니다. 사진이 사라지지
+        // 않게 하는 것이 이 큐의 존재 이유인데 정반대로 동작했습니다.
+        //
+        // 서버가 "이 사진은 받을 수 없다"고 확정한 경우만 버립니다. 5xx는
+        // 서버 사정이고, 401은 토큰 문제이며, 408·429는 다시 걸면 됩니다.
+        if (isPermanentReject(e.status)) {
+          debugPrint('outbox drop (${e.status}): ${e.message}');
+          await file.delete();
+        } else {
+          debugPrint('outbox keep (${e.status}): ${e.message}');
+          remaining.add(entry);
+        }
       }
     }
 
