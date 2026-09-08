@@ -332,3 +332,40 @@ async def test_기기가_없으면_상한을_소진하지_않는다(client, db, 
     await db.commit()
 
     assert len(_fake_provider.sent) == 1, "기기 없이 흘려보낸 알림이 상한을 먹었다"
+
+
+@pytest.mark.asyncio
+async def test_기기를_해제하면_그_기기로_안_간다(client, db, _fake_provider):
+    """로그아웃 경로가 이걸 부른다. 안 부르면 기기를 넘겨받은 사람에게 이전
+    사용자의 식사·체중 알림이 계속 간다 — 건강 데이터라 더 나쁘다."""
+    r = await client.post("/api/auth/request-code", json={"email": "handover@example.com"})
+    code = r.json()["dev_code"]
+    r = await client.post(
+        "/api/auth/verify", json={"email": "handover@example.com", "code": code}
+    )
+    token = r.json()["access_token"]
+    user_id = r.json()["user"]["id"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = await client.post(
+        "/api/devices",
+        headers=headers,
+        json={"token": fcm_token("tok-handover"), "platform": "ios"},
+    )
+    assert r.status_code == 201, r.text
+    device_id = r.json()["id"]
+
+    n = await notify(db, user_id=user_id, kind="meal_ready", title="해제 전")
+    await db.commit()
+    await push.deliver(db, n.id)
+    await db.commit()
+    assert len(_fake_provider.sent) == 1
+
+    r = await client.delete(f"/api/devices/{device_id}", headers=headers)
+    assert r.status_code in (200, 204), r.text
+
+    n = await notify(db, user_id=user_id, kind="meal_ready", title="해제 후")
+    await db.commit()
+    await push.deliver(db, n.id)
+    await db.commit()
+    assert len(_fake_provider.sent) == 1, "해제한 기기로 푸시가 갔다"

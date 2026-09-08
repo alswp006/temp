@@ -112,6 +112,9 @@ class _SikpanAppState extends State<SikpanApp> with WidgetsBindingObserver {
   late final GoRouter _router;
   StreamSubscription<List<ConnectivityResult>>? _connectivity;
 
+  /// 푸시를 등록해 둔 사용자. 바뀌면 다시 등록합니다.
+  int? _pushUserId;
+
   @override
   void initState() {
     super.initState();
@@ -149,10 +152,17 @@ class _SikpanAppState extends State<SikpanApp> with WidgetsBindingObserver {
   }
 
   void _onSessionChanged() {
-    Crash.setUser(widget.session.user?.id);
-    if (widget.session.isLoggedIn && !widget.push.isReady) {
+    final userId = widget.session.user?.id;
+    Crash.setUser(userId);
+    // 사용자가 바뀌면 무조건 다시 등록합니다. isReady만 보면, 같은 프로세스에서
+    // 다른 사람이 로그인했을 때 start()가 돌지 않아 그 사람은 푸시를 하나도
+    // 받지 못합니다.
+    if (widget.session.isLoggedIn &&
+        (!widget.push.isReady || userId != _pushUserId)) {
+      _pushUserId = userId;
       widget.push.start();
     }
+    if (!widget.session.isLoggedIn) _pushUserId = null;
     // 로그인 직후에도 한 번 밀어 줍니다. 로그아웃 상태에서 찍어 둔 사진은
     // 토큰이 없어 못 올라갔을 수 있습니다.
     if (widget.session.isLoggedIn) widget.outbox.drain();
@@ -174,6 +184,7 @@ class _SikpanAppState extends State<SikpanApp> with WidgetsBindingObserver {
       session: widget.session,
       outbox: widget.outbox,
       data: widget.data,
+      push: widget.push,
       child: MaterialApp.router(
         title: '식판',
         debugShowCheckedModeBanner: false,

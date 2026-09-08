@@ -10,6 +10,7 @@ import 'package:sikpan_app/api/models.dart';
 import 'package:sikpan_app/api/outbox.dart';
 import 'package:sikpan_app/api/session.dart';
 import 'package:sikpan_app/app_state.dart';
+import 'package:sikpan_app/services/push_client.dart';
 import 'package:sikpan_app/features/today_screen.dart';
 import 'package:sikpan_app/theme/app_theme.dart';
 import 'package:sikpan_app/ui/labels.dart';
@@ -55,6 +56,7 @@ Widget _wrap(Widget child, http.Client client) {
     session: session,
     outbox: Outbox(api),
     data: DataBus(),
+    push: PushClient(api),
     child: MaterialApp(
       theme: AppTheme.light(),
       home: Scaffold(body: child),

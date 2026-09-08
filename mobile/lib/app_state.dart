@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'api/client.dart';
 import 'api/outbox.dart';
 import 'api/session.dart';
+import 'services/push_client.dart';
 
 /// 서버 데이터가 바뀌었다는 신호.
 ///
@@ -34,6 +35,7 @@ class AppScope extends InheritedNotifier<Session> {
     required this.session,
     required this.outbox,
     required this.data,
+    required this.push,
     required super.child,
   }) : super(notifier: session);
 
@@ -41,6 +43,9 @@ class AppScope extends InheritedNotifier<Session> {
   final Session session;
   final Outbox outbox;
   final DataBus data;
+
+  /// 로그아웃 화면이 기기 등록을 해제하려면 여기까지 닿아야 합니다.
+  final PushClient push;
 
   /// [listen]이 false면 의존성을 등록하지 않습니다 — 이게 기본입니다.
   ///
@@ -65,6 +70,7 @@ extension AppScopeX on BuildContext {
   Session get session => AppScope.of(this).session;
   Outbox get outbox => AppScope.of(this).outbox;
   DataBus get data => AppScope.of(this).data;
+  PushClient get pushClient => AppScope.of(this).push;
 }
 
 /// 데이터가 바뀌면 스스로 다시 불러오는 화면.

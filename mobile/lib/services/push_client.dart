@@ -20,6 +20,10 @@ class PushClient {
   bool _ready = false;
   String? _token;
 
+  /// 서버가 준 기기 행 id. 로그아웃할 때 이 값으로 해제합니다.
+  /// 예전에는 등록 응답을 버려서, 해제하고 싶어도 무엇을 지울지 몰랐습니다.
+  int? _deviceId;
+
   String? get token => _token;
   bool get isReady => _ready;
 
@@ -61,12 +65,13 @@ class PushClient {
   Future<void> _register(String token) async {
     _token = token;
     try {
-      await api.post('/devices', body: {
+      final json = await api.post('/devices', body: {
         'token': token,
         'platform': defaultTargetPlatform == TargetPlatform.iOS
             ? 'ios'
             : 'android',
       });
+      if (json is Map && json['id'] is int) _deviceId = json['id'] as int;
     } on ApiException catch (e) {
       debugPrint('기기 등록 실패: ${e.message}');
     } on OfflineException {
@@ -74,13 +79,23 @@ class PushClient {
     }
   }
 
-  /// 로그아웃할 때. 안 부르면 기기를 넘겨받은 사람에게 내 알림이 갑니다.
-  Future<void> unregister(int? deviceId) async {
-    if (deviceId == null) return;
-    try {
-      await api.delete('/devices/$deviceId');
-    } on Exception catch (e) {
-      debugPrint('기기 해제 실패: $e');
+  /// 로그아웃하기 **전에** 부릅니다.
+  ///
+  /// 안 부르면 기기를 넘겨받은 사람에게 이전 사용자의 식사·체중 알림이 갑니다.
+  /// 토큰이 아직 살아 있을 때만 서버가 받아 주므로 signOut 앞에 와야 합니다.
+  Future<void> unregister() async {
+    final id = _deviceId;
+    if (id != null) {
+      try {
+        await api.delete('/devices/$id');
+      } on Exception catch (e) {
+        debugPrint('기기 해제 실패: $e');
+      }
     }
+    // 서버 호출이 실패해도 이 기기의 상태는 반드시 비웁니다. 안 그러면 다음
+    // 사용자가 로그인해도 start()가 다시 돌지 않아 푸시를 하나도 못 받습니다.
+    _deviceId = null;
+    _token = null;
+    _ready = false;
   }
 }

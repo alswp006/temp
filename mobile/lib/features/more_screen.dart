@@ -910,6 +910,9 @@ class _MoreScreenState extends State<MoreScreen> with DataListener<MoreScreen> {
     if (ok != true || !mounted) return;
     final router = GoRouter.of(context);
     final session = context.session;
+    // 해제가 먼저입니다. signOut 뒤에는 토큰이 없어 서버가 받아 주지 않고,
+    // 그러면 이 기기를 넘겨받은 사람에게 내 알림이 계속 갑니다.
+    await context.pushClient.unregister();
     await session.signOut();
     router.go('/login');
   }
