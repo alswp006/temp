@@ -214,7 +214,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('900'), findsOneWidget);
-      expect(find.textContaining('목표 미설정'), findsOneWidget);
+      // 목표가 없으면 "남음"이 아니라 "섭취"로 말하고, 그 자리에서 목표를
+      // 정하러 갈 수 있어야 합니다.
+      expect(find.textContaining('kcal 섭취'), findsOneWidget);
+      expect(find.text('목표 설정'), findsOneWidget);
       expect(find.textContaining('초과'), findsNothing);
     });
 
@@ -231,7 +234,7 @@ void main() {
       await tester.pumpWidget(_wrap(const TodayScreen(), client));
       await tester.pump(); // 폴링 타이머가 걸려 있어 settle하지 않습니다.
 
-      expect(find.textContaining('분석 중인 식사 2건'), findsOneWidget);
+      expect(find.textContaining('식사 2건을 분석하고 있습니다'), findsOneWidget);
     });
   });
 
