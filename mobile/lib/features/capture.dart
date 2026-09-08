@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../api/client.dart';
 import '../app_state.dart';
+import '../theme/tokens.dart';
 import '../ui/widgets.dart';
 
 /// 사진 한 장을 식사로 만드는 경로. 앱에서 가장 자주 눌리는 버튼이므로
@@ -45,7 +46,12 @@ class MealCapture {
           'shot_at': shotAt.toUtc().toIso8601String(),
         },
       );
-      if (context.mounted) showToast(context, '접수했습니다. 분석 중…');
+      // 화면들이 스스로 다시 불러옵니다. 이게 없으면 서버에는 저장됐는데
+      // 오늘 화면은 "0끼"인 채로 남습니다.
+      scope.data.bump();
+      if (context.mounted) {
+        showToast(context, '접수했습니다. 분석 중…', tone: ToastTone.success);
+      }
       return true;
     } on OfflineException {
       await scope.outbox.enqueue(bytes, canteenId: canteenId, shotAt: shotAt);
@@ -54,7 +60,7 @@ class MealCapture {
       }
       return true;
     } on ApiException catch (e) {
-      if (context.mounted) showToast(context, e.message);
+      if (context.mounted) showToast(context, e.message, tone: ToastTone.error);
       return false;
     }
   }
@@ -82,35 +88,119 @@ class MealCapture {
 /// 촬영 소스를 고르는 시트. 카메라가 없는 기기(시뮬레이터)에서도 막히지
 /// 않도록 항상 앨범 선택지를 함께 둡니다.
 Future<ImageSource?> askImageSource(BuildContext context,
-    {String title = '사진'}) {
+    {String title = '사진', String? subtitle}) {
   return showModalBottomSheet<ImageSource>(
     context: context,
     showDragHandle: true,
-    builder: (context) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(title,
-                  style: Theme.of(context).textTheme.titleMedium),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('카메라로 촬영'),
-            onTap: () => Navigator.pop(context, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('앨범에서 선택'),
-            onTap: () => Navigator.pop(context, ImageSource.gallery),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
+    backgroundColor: context.c.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius:
+          BorderRadius.vertical(top: Radius.circular(Dim.radiusXl)),
     ),
+    builder: (context) {
+      final c = context.c;
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              Dim.s16, Dim.s4, Dim.s16, Dim.s16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    Dim.s4, 0, Dim.s4, Dim.s16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4)),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: Dim.s4),
+                      Text(subtitle,
+                          style: TextStyle(fontSize: 13, color: c.ink3)),
+                    ],
+                  ],
+                ),
+              ),
+              _SourceTile(
+                icon: Icons.photo_camera_rounded,
+                label: '카메라로 촬영',
+                hint: '지금 눈앞의 것을 찍습니다',
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              const SizedBox(height: Dim.s8),
+              _SourceTile(
+                icon: Icons.photo_library_rounded,
+                label: '앨범에서 선택',
+                hint: '이미 찍어 둔 사진을 씁니다',
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
   );
+}
+
+class _SourceTile extends StatelessWidget {
+  const _SourceTile({
+    required this.icon,
+    required this.label,
+    required this.hint,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String hint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Pressable(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(Dim.s16),
+        decoration: BoxDecoration(
+          color: c.surface2,
+          borderRadius: BorderRadius.circular(Dim.radius),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: c.accentSoft,
+                borderRadius: BorderRadius.circular(Dim.radiusSm),
+              ),
+              child: Icon(icon, size: 21, color: c.accent),
+            ),
+            const SizedBox(width: Dim.s12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: Dim.s2),
+                  Text(hint,
+                      style: TextStyle(fontSize: 12.5, color: c.ink3)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 20, color: c.ink3),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -57,7 +57,8 @@ Future<void> main() async {
     final session = Session();
     await session.restore();
     final api = ApiClient(baseUrl: _apiBase, session: session);
-    final outbox = Outbox(api);
+    final data = DataBus();
+    final outbox = Outbox(api)..onChanged = data.bump;
     final push = PushClient(api);
 
     Crash.setUser(session.user?.id);
@@ -67,6 +68,7 @@ Future<void> main() async {
       api: api,
       outbox: outbox,
       push: push,
+      data: data,
     ));
   });
 }
@@ -78,18 +80,20 @@ class SikpanApp extends StatefulWidget {
     required this.api,
     required this.outbox,
     required this.push,
+    required this.data,
   });
 
   final Session session;
   final ApiClient api;
   final Outbox outbox;
   final PushClient push;
+  final DataBus data;
 
   @override
   State<SikpanApp> createState() => _SikpanAppState();
 }
 
-class _SikpanAppState extends State<SikpanApp> {
+class _SikpanAppState extends State<SikpanApp> with WidgetsBindingObserver {
   late final GoRouter _router;
   StreamSubscription<List<ConnectivityResult>>? _connectivity;
 
@@ -97,6 +101,7 @@ class _SikpanAppState extends State<SikpanApp> {
   void initState() {
     super.initState();
     _router = buildRouter(widget.session);
+    WidgetsBinding.instance.addObserver(this);
 
     // 로그인 상태에서만 기기를 등록합니다. 로그아웃 상태에서 등록하면
     // 누구에게 보낼지 알 수 없습니다.
@@ -114,15 +119,33 @@ class _SikpanAppState extends State<SikpanApp> {
     });
   }
 
+  /// 연결 상태 변화만 신호로 삼으면 큐가 갇힙니다.
+  ///
+  /// 와이파이는 멀쩡한데 서버만 죽어 있던 경우, 서버가 살아나도 OS는 아무
+  /// 이벤트도 주지 않습니다. 그러면 "연결되면 자동 전송"이라고 적힌 배너가 이미
+  /// 연결된 상태로 계속 남습니다. 앱이 다시 앞으로 나올 때마다 한 번씩 밀어
+  /// 주면 그 구멍이 막힙니다.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.session.isLoggedIn) {
+      widget.outbox.drain();
+      widget.data.bump();
+    }
+  }
+
   void _onSessionChanged() {
     Crash.setUser(widget.session.user?.id);
     if (widget.session.isLoggedIn && !widget.push.isReady) {
       widget.push.start();
     }
+    // 로그인 직후에도 한 번 밀어 줍니다. 로그아웃 상태에서 찍어 둔 사진은
+    // 토큰이 없어 못 올라갔을 수 있습니다.
+    if (widget.session.isLoggedIn) widget.outbox.drain();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.session.removeListener(_onSessionChanged);
     _connectivity?.cancel();
     widget.api.close();
@@ -135,6 +158,7 @@ class _SikpanAppState extends State<SikpanApp> {
       api: widget.api,
       session: widget.session,
       outbox: widget.outbox,
+      data: widget.data,
       child: MaterialApp.router(
         title: '식판',
         debugShowCheckedModeBanner: false,

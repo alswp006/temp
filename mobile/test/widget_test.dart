@@ -54,6 +54,7 @@ Widget _wrap(Widget child, http.Client client) {
     api: api,
     session: session,
     outbox: Outbox(api),
+    data: DataBus(),
     child: MaterialApp(
       theme: AppTheme.light(),
       home: Scaffold(body: child),

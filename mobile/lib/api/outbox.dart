@@ -19,6 +19,11 @@ class Outbox {
   final ApiClient api;
   static const _key = 'sikpan.outbox';
 
+  /// 큐가 바뀌면 알립니다 (적재·전송). 화면이 대기 장수와 새 끼니를 즉시
+  /// 반영할 수 있도록, 여기서 알리지 않으면 "이미 보냈는데 아직 대기 중"이라고
+  /// 거짓말하는 배너가 남습니다.
+  VoidCallback? onChanged;
+
   Future<Directory> _dir() async {
     final base = await getApplicationSupportDirectory();
     final dir = Directory('${base.path}/outbox');
@@ -63,6 +68,7 @@ class Outbox {
       'shot_at': (shotAt ?? DateTime.now()).toUtc().toIso8601String(),
     });
     await _save(entries);
+    onChanged?.call();
   }
 
   /// 큐를 비웁니다. 보낸 개수를 돌려줍니다.
@@ -102,6 +108,7 @@ class Outbox {
     }
 
     await _save(remaining);
+    if (sent > 0 || remaining.length != entries.length) onChanged?.call();
     return sent;
   }
 }
