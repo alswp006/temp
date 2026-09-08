@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 60 * 24 * 14
     login_code_ttl_minutes: int = 15
     login_code_max_attempts: int = 5
+    # 코드 요청 빈도. 이메일별은 DB(login_codes)로 세고, 출발지별은 프로세스
+    # 메모리로 셉니다 — 자세한 것은 app/core/ratelimit.py.
+    login_code_per_email_per_hour: int = 5
+    login_code_per_ip_per_hour: int = 20
     # 로그인 코드를 API 응답에 실어 보냅니다. SMTP 없이 로그인하려고 둔
     # 개발 편의 기능인데, 기본값이 True였기 때문에 compose를 쓰지 않고
     # uvicorn으로 직접 띄운 배포는 OTP를 그대로 응답에 노출하고 있었습니다.

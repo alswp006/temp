@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
-from fastapi import APIRouter
-from sqlalchemy import select
+from fastapi import APIRouter, Request
+from sqlalchemy import func, select
 
 from app.config import settings
 from app.core.deps import CurrentUser, DbSession
@@ -17,6 +17,7 @@ from app.core.security import (
     new_login_code,
     verify_secret,
 )
+from app.core.ratelimit import SlidingWindow, client_key
 from app.core.timeutil import utcnow
 from app.errors import NotFound, RateLimited, Unauthorized
 from app.models import ApiToken, LoginCode, User
@@ -37,15 +38,43 @@ from app.schemas import (
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# 출발지별 한도. 이메일을 바꿔 가며 계정을 찍어내는 것은 이메일별 한도로는
+# 막히지 않습니다.
+_ip_limit = SlidingWindow(
+    limit=settings.login_code_per_ip_per_hour, window_seconds=3600
+)
+
 
 @router.post("/request-code", response_model=LoginRequestResponse)
-async def request_code(payload: LoginRequest, db: DbSession) -> LoginRequestResponse:
+async def request_code(
+    payload: LoginRequest, db: DbSession, request: Request
+) -> LoginRequestResponse:
     """Issue a one-time code. Creates the account on first request.
 
     The response is identical whether or not the account exists, so this
     endpoint can't be used to enumerate registered emails.
     """
     email = payload.email.lower()
+
+    # 이 엔드포인트는 인증이 없고 계정을 만든다. 막지 않으면 남의 편지함으로
+    # 메일을 무한히 보낼 수 있고, 계정도 무한히 찍어낼 수 있다.
+    #
+    # 이메일별은 이미 남기고 있는 login_codes 행을 센다. DB에 있으므로 워커가
+    # 여러 개여도, 재시작해도 유효하다.
+    since = utcnow() - timedelta(hours=1)
+    recent = (
+        await db.execute(
+            select(func.count())
+            .select_from(LoginCode)
+            .where(LoginCode.email == email, LoginCode.created_at >= since)
+        )
+    ).scalar_one()
+    if recent >= settings.login_code_per_email_per_hour:
+        raise RateLimited("코드를 너무 자주 요청했습니다. 잠시 후 다시 시도해 주세요.")
+
+    if not _ip_limit.allow(client_key(request)):
+        raise RateLimited("요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.")
+
     user = (
         await db.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()

@@ -109,3 +109,37 @@ async def test_없는_식당으로_올리면_거절한다(client: AsyncClient, p
         files={"file": ("tray.jpg", photo_bytes, "image/jpeg")},
     )
     assert r.status_code == 202, r.text
+
+
+@pytest.mark.asyncio
+async def test_같은_주소로_코드를_무한히_보낼_수_없다(client: AsyncClient):
+    """인증 없이 남의 편지함으로 메일을 무한히 보낼 수 있었다."""
+    email = "flood@example.com"
+    for i in range(5):
+        r = await client.post("/api/auth/request-code", json={"email": email})
+        assert r.status_code == 200, f"{i}번째"
+
+    r = await client.post("/api/auth/request-code", json={"email": email})
+    assert r.status_code == 429, r.text
+
+    # 다른 주소는 막히지 않는다 — 이메일별 한도이지 전역 한도가 아니다.
+    r = await client.post("/api/auth/request-code", json={"email": "other@example.com"})
+    assert r.status_code == 200, r.text
+
+
+@pytest.mark.asyncio
+async def test_출발지별로도_막는다(client: AsyncClient):
+    """주소를 바꿔 가며 계정을 찍어내는 것은 이메일별 한도로 안 막힌다."""
+    from app.api.auth import _ip_limit
+
+    _ip_limit.reset()
+    ok = 0
+    for i in range(30):
+        r = await client.post(
+            "/api/auth/request-code", json={"email": f"bulk{i}@example.com"}
+        )
+        if r.status_code == 429:
+            break
+        ok += 1
+    assert ok < 30, "출발지 한도가 걸리지 않았다"
+    assert ok >= 5, f"한도가 너무 빡빡하다 ({ok}건)"

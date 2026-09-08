@@ -33,6 +33,20 @@ from app.models import Base  # noqa: E402
 from app.services import nutrition  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """출발지별 한도는 프로세스 메모리에 쌓입니다.
+
+    테스트는 전부 같은 출발지로 보이므로, 비우지 않으면 스위트 중간부터 무관한
+    테스트가 429로 죽습니다. 한도 자체는 전용 테스트에서 확인합니다.
+    """
+    from app.api.auth import _ip_limit
+
+    _ip_limit.reset()
+    yield
+    _ip_limit.reset()
+
+
 @pytest_asyncio.fixture(scope="function")
 async def db():
     async with engine.begin() as conn:
